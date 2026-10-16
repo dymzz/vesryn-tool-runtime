@@ -1,0 +1,7 @@
+# Keep the compatible dagger.json manifest; resolve the existing approved secret.
+[modules.vesryn-tool-runtime-ci]
+source = "."
+entrypoint = true
+
+[modules.vesryn-tool-runtime-ci.settings]
+gitToken = "env:ENGINEERING_CI_READ_TOKEN"

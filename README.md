@@ -1,7 +1,20 @@
 # vesryn-tool-runtime
 
-Python 示例项目；业务代码在 app.py，测试在 tests/。
+Independent Python tool contracts, explicit Provider composition, progressive
+discovery, Selection Binding Schema 1, admission and batch invocation. Python 3.14+.
 
-CI 使用 engineering-ci v0.6.5（804d791c60d34468166b6910c88fbc8149fdbf26）。
-本地入口：`dagger check`；报告入口：`dagger api call test-results`。
-检查尚未执行，生成骨架不代表 CI 通过。
+`Registration → Discovery → Binding → Invocation → Execution → Validation → Observation`
+
+Start with [the documentation index](docs/README.md), including the runnable
+[quickstart](docs/quickstart.md), [public API](docs/python-api.md) and
+[delivery evidence](docs/delivery/tool-runtime-0.1.0.md).
+
+The package owns tools, not workflows. Adapters keep their execution backends;
+consumers keep workflow state, checkpoint storage, recovery and domain policy.
+Events go through the existing `vesryn_log.EventSink` protocol. Dagger is optional.
+
+Build with `uv build`; install the wheel with its declared dependencies. The
+development checkout pins vesryn-log's released source in `tool.uv.sources`.
+Versioned artifacts and source provenance are delivered through
+[GitHub Releases](https://github.com/dymzz/vesryn-tool-runtime/releases).
+Release readiness is recorded separately from successful local verification.

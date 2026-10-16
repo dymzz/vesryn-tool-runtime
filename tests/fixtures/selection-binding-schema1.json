@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "workflow-selection-binding",
+  "tool_id": "legacy.check",
+  "provider": "legacy-provider",
+  "version": "1",
+  "contract_sha256": "8d12a977559133e511825c886f07a027a6a5504d6c4b07cc04a437e13aeabc8d",
+  "contract_summary": {
+    "tool_id": "legacy.check",
+    "description": "",
+    "domain": "",
+    "effect": "check",
+    "contract_version": "1",
+    "contract_sha256": "8d12a977559133e511825c886f07a027a6a5504d6c4b07cc04a437e13aeabc8d"
+  },
+  "parameters": {
+    "value": 2
+  },
+  "scope": {
+    "repository": "example",
+    "environment": "dagger",
+    "permissions": [
+      "check"
+    ]
+  },
+  "workflow": {
+    "definition_id": "5f60b7ef5238e776d07901ef1bb7706845725212c4f8d293e71dccd4b2799784",
+    "generation_id": "13433ab7f23b4eff905a626e0ac6a8fb",
+    "workflow_path": ".test-tools/legacy-generation/13433ab7f23b4eff905a626e0ac6a8fb/workflow.json"
+  },
+  "execution_id": null,
+  "binding_id": "82043d17ea88a0a86655d64282734a00848c96a1000200c825c8f080477add4d"
+}

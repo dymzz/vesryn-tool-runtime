@@ -1,0 +1,15 @@
+{
+  "name": "vesryn-tool-runtime-ci",
+  "engineVersion": "v1.0.0-beta.16",
+  "sdk": {
+    "source": "python"
+  },
+  "source": ".dagger",
+  "dependencies": [
+    {
+      "name": "engineering-ci",
+      "source": "github.com/dymzz/engineering-ci@0f74b2f776796b9db83f7a61c0849e504afdbea0",
+      "pin": "0f74b2f776796b9db83f7a61c0849e504afdbea0"
+    }
+  ]
+}

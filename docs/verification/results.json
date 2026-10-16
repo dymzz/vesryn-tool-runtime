@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-16",
+  "environment": {
+    "python": "3.14.3",
+    "uv": "0.12.23",
+    "dagger": "1.0.0-beta.16",
+    "docker": "29.4.0",
+    "vesryn_log_commit": "030c5a8edf820588e29f53803b6baaf53b1f6e57"
+  },
+  "pytest": {
+    "main_passed": 40,
+    "wheel_public_passed": 39,
+    "vesryn_passed": 470,
+    "engineering_ci_passed": 1232,
+    "engineering_ci_skipped": 8,
+    "engineering_ci_subtests_passed": 103
+  },
+  "main_dagger_ci": {
+    "exit_code": 0,
+    "engine": "1.0.0-beta.16",
+    "engineering_ci": "0f74b2f776796b9db83f7a61c0849e504afdbea0"
+  },
+  "wheel": {
+    "version": "0.1.0",
+    "sha256": "93ce72f1c9119ad9802b6c94bc0cfa4ca769d76b21c644d7c48419bb4d3fff5e",
+    "reverse_consumers_installed": false
+  },
+  "real_dagger": {
+    "shared": {
+      "tool_id": "verify.stateful",
+      "status": "passed",
+      "exit_code": 0,
+      "observed_cases": 3,
+      "observed_transitions": 15,
+      "observation_errors": 0
+    },
+    "engineering": {
+      "call_status": "passed",
+      "call_exit_code": 0,
+      "resume_exit_code": 0,
+      "resume_reused": true,
+      "cli_run_exit_code": 0,
+      "batch_exit_code": 0,
+      "batch_report_count": 1
+    },
+    "direct_shared_binding": {
+      "provider": "tooling",
+      "binding_schema": 1,
+      "workflow_constructed": false,
+      "status": "passed",
+      "exit_code": 0,
+      "observation_status": "complete"
+    }
+  },
+  "release": {
+    "created": false,
+    "C6": "NOT VERIFIED",
+    "remote_ci_dispatched": false,
+    "development_path_dependencies_rejected_by_production_security": true
+  }
+}
