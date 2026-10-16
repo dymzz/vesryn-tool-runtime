@@ -14,7 +14,7 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 wheel-exclude = ["**/AGENTS.md"]
-source-include = ["docs/**", "examples/**", "tests/test_runtime.py", "tests/test_boundaries.py", "tests/fixtures/**", "uv.lock"]
+source-include = ["docs/**", "examples/**", "api/dagger.json", "api/pyproject.toml", "api/src/**/*.py", "tests/test_runtime.py", "tests/test_boundaries.py", "tests/fixtures/**", "uv.lock"]
 
 [tool.uv.sources]
 vesryn-log = { git = "https://github.com/dymzz/vesryn-log.git", rev = "030c5a8edf820588e29f53803b6baaf53b1f6e57" }

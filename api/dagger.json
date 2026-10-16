@@ -1,0 +1,7 @@
+{
+  "name": "vesryn-tool-runtime-api",
+  "engineVersion": "v1.0.0-beta.16",
+  "sdk": {"source": "python"},
+  "source": ".",
+  "include": ["../src/**", "../pyproject.toml", "../README.md", "../LICENSE"]
+}
