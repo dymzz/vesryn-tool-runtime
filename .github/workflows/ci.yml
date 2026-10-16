@@ -38,3 +38,10 @@ jobs:
           unset GH_TOKEN
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/direct_tool.py
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I -c 'import importlib.util as u; assert u.find_spec("vesryn") is None and u.find_spec("engineering_ci") is None'
+      - name: Retain versioned Python artifacts
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: vesryn-tool-runtime-dist
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
