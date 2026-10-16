@@ -1,0 +1,40 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  python:
+    uses: dymzz/engineering-ci/.github/workflows/reusable-python-ci.yml@0f74b2f776796b9db83f7a61c0849e504afdbea0 # v0.6.7 fixed commit
+    with:
+      pytest_report_function: test-results
+      pytest_check: vesryn-tool-runtime-ci:tests
+    secrets:
+      ENGINEERING_CI_READ_TOKEN: ${{ secrets.ENGINEERING_CI_READ_TOKEN }}
+
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.12.23'
+          python-version: '3.14'
+      - name: Verify the independent installed wheel
+        env:
+          GH_TOKEN: ${{ secrets.ENGINEERING_CI_READ_TOKEN }}
+        run: |
+          gh auth setup-git --hostname github.com
+          uv lock --check
+          uv build
+          uv export --locked --no-dev --no-emit-project --output-file "$RUNNER_TEMP/tool-runtime.txt"
+          uv venv --python 3.14 "$RUNNER_TEMP/tool-runtime-wheel"
+          uv pip install --python "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -r "$RUNNER_TEMP/tool-runtime.txt" dist/vesryn_tool_runtime-0.1.0-py3-none-any.whl
+          unset GH_TOKEN
+          "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/direct_tool.py
+          "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I -c 'import importlib.util as u; assert u.find_spec("vesryn") is None and u.find_spec("engineering_ci") is None'
