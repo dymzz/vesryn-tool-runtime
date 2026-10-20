@@ -30,3 +30,13 @@ dagger api call --load-module ./api python-package export --path ./dist/vesryn_t
 
 This interface delivers a Python artifact. Tool execution, scope, binding and
 event recording retain the documented Python contracts.
+
+## Local Log compatibility
+
+Project metadata requires `vesryn-log>=0.1.0,<0.2.0`; the already delivered 0.1.0
+wheel still carries the narrower `vesryn-log==0.1.0`, so its recorded SHA-256 is
+unaffected until a new wheel is built. Development `tool.uv.sources` and uv.lock
+continue to select the existing immutable 0.1.0 commit. Explicit local consumers
+may supply the selected Log 0.1.2 wheel together with this wheel and use normal
+dependency resolution. Do not bypass metadata with `--no-deps`. Record wheel hashes,
+not only the shared 0.1.0 version number, for an uncommitted development candidate.
