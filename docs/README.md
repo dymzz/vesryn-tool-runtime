@@ -9,6 +9,7 @@
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): existing C1–C8 acceptance standard.
 - [0.1.0 extraction assessment](delivery/tool-runtime-0.1.0.md): actual evidence, statuses and publication boundary.
+- [TR-001 binding/admission compatibility](delivery/tr-001-binding-admission.md): public contract compatibility review for issue #2.
 - [Changelog](changelog.md): version 0.1.0 extraction.
 
 Up: [Repository](../README.md).

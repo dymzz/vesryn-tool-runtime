@@ -1,14 +1,17 @@
 """Public ownership and JSON/Schema boundaries independent of any consumer."""
 
 import ast
+import json
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from vesryn_log import JsonlSink
 
 import vesryn_tool_runtime
 from vesryn_tool_runtime import (
     Catalog,
+    Invocation,
     ToolResult,
     ToolRuntime,
     ToolRuntimeError,
@@ -114,3 +117,27 @@ def test_original_engineering_schema1_document_remains_readable():
     )
     spec, _ = verify_binding(binding, tools, current_scope=scope)
     assert spec.sha256 == binding["contract_sha256"]
+
+
+def test_real_log_sink_preserves_failure_and_excludes_private_payloads(tmp_path):
+    class Adapter:
+        def invoke(self, calls, context):
+            return {
+                call.step_id: ToolResult("failed", 7, reason="private adapter reason")
+                for call in calls
+            }
+
+    tools = Catalog()
+    tools.register(ToolSpec("example.check", {}, {}), Adapter())
+    journal = tmp_path / "tool-events.jsonl"
+    receipt = ToolRuntime(
+        tools,
+        scope=DiscoveryScope(permissions=frozenset({"check"})),
+        event_sink=JsonlSink(journal),
+    ).invoke(Invocation("call", "example.check", {"private": "private input value"}, 1))
+    assert receipt.results["call"]["exit_code"] == 7
+    assert receipt.observation_status == "complete" and not receipt.observation_errors
+    raw = journal.read_text(encoding="utf-8")
+    events = [json.loads(line) for line in raw.splitlines()]
+    assert events and all(event["tool_id"] == "example.check" for event in events)
+    assert "private input value" not in raw and "private adapter reason" not in raw
