@@ -1,14 +1,17 @@
 """Public ownership and JSON/Schema boundaries independent of any consumer."""
 
 import ast
+import json
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from vesryn_log import JsonlSink
 
 import vesryn_tool_runtime
 from vesryn_tool_runtime import (
     Catalog,
+    Invocation,
     ToolResult,
     ToolRuntime,
     ToolRuntimeError,
@@ -117,11 +120,6 @@ def test_original_engineering_schema1_document_remains_readable():
 
 
 def test_real_log_sink_preserves_failure_and_excludes_private_payloads(tmp_path):
-    import json
-
-    from vesryn_log import JsonlSink
-    from vesryn_tool_runtime import Invocation
-
     class Adapter:
         def invoke(self, calls, context):
             return {
