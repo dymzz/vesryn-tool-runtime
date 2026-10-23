@@ -74,8 +74,8 @@ from vesryn_tool_runtime import (
     AssetPolicy, AssetTarget, load_shared_definitions, register_shared_definitions,
 )
 
-records = load_shared_definitions("python.json")   # bundled name, pure read
-register_shared_definitions(tools, records)        # capabilities must exist already
+records = load_shared_definitions("python.json")  # bundled name, pure read
+register_shared_definitions(tools, records)  # capabilities must exist already
 selection = tools.select_asset(
     "python.dependency-hygiene",
     target=AssetTarget("linux", "x86_64", python="3.14"),
