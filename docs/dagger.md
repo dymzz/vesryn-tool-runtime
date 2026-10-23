@@ -25,7 +25,7 @@ through the same interface; no adjacent source directory is inferred.
 For an explicit local development check:
 
 ```sh
-dagger api call --load-module ./api python-package export --path ./dist/vesryn_tool_runtime-0.1.0-py3-none-any.whl
+dagger api call --load-module ./api python-package export --path ./dist/vesryn_tool_runtime-0.2.0-py3-none-any.whl
 ```
 
 This interface delivers a Python artifact. Tool execution, scope, binding and

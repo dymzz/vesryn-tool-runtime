@@ -11,7 +11,21 @@
 - No formal release or tag is created. Read [readiness](delivery/tool-runtime-0.1.0.md)
   for verified paths and remaining publication work.
 
-## Unreleased
+## 0.2.0 — local tool assets
+
+- Integrate A/B/C through the same Catalog, receipt and index, with independent
+  multi-version uv environments and verified native payloads. See the
+  [joint acceptance and release assessment](tasks/vesryn-tool-runtime/P0-local-tool-assets.md).
+- Require current AssetPolicy on uv lock/preparation/inspection/command, retain a
+  published environment's frozen lock and reuse it without rebuilding after cache
+  removal. This refines the unreleased #7 prototype; released 0.1 interfaces and
+  Binding Schema 1 remain compatible.
+
+- Add explicit aria2 native-asset acquisition with pinned downloader provenance,
+  verified offline reuse, safe staged extraction and immutable version directories.
+  Reuse the common receipt/index and existing File/Directory transport; include
+  reviewed OSV/Hyperfine definitions. See [native assets](native-assets.md) and
+  [issue #8 delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md).
 
 - Add independent CLI asset definitions/target and version-policy resolution to the
   existing Catalog, plus frozen selection snapshots and a shared, integrity-checked
@@ -27,4 +41,3 @@
   [TR-001](delivery/tr-001-binding-admission.md).
 
 - Add a thin uv adapter (UvToolBackend) that delegates resolution, download and environments to uv, with per-artifact environments, shared receipts and a hashed Linux lock description. Acquisition and execution stay separately permitted. See [uv tool environments](uv-tool-assets.md).
-

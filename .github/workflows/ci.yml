@@ -34,10 +34,37 @@ jobs:
           uv build
           uv export --locked --no-dev --no-emit-project --output-file "$RUNNER_TEMP/tool-runtime.txt"
           uv venv --python 3.14 "$RUNNER_TEMP/tool-runtime-wheel"
-          uv pip install --python "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -r "$RUNNER_TEMP/tool-runtime.txt" dist/vesryn_tool_runtime-0.1.0-py3-none-any.whl
+          uv pip install --python "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -r "$RUNNER_TEMP/tool-runtime.txt" dist/vesryn_tool_runtime-0.2.0-py3-none-any.whl
           unset GH_TOKEN
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/direct_tool.py
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I -c 'import importlib.util as u; assert u.find_spec("vesryn") is None and u.find_spec("engineering_ci") is None'
+      - name: Prepare independent acceptance toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes aria2=1.37.0+debian-1build3
+          uv pip install --python "$RUNNER_TEMP/tool-runtime-wheel/bin/python" dagger-io==1.0.0b16
+          apt-cache show aria2=1.37.0+debian-1build3 > "$RUNNER_TEMP/aria2-package.txt"
+      - name: Prepare Dagger CLI
+        uses: dagger/dagger-for-github@v8.4.1
+        with:
+          version: v1.0.0-beta.16
+      - name: Verify real assets and public Dagger delivery
+        run: |
+          dagger --progress plain run "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/asset_acceptance.py \
+            --root "$RUNNER_TEMP/asset-acceptance" \
+            --aria2 "$(command -v aria2c)" --aria2-version 1.37.0 \
+            --aria2-sha256 "$(sha256sum "$(command -v aria2c)" | cut -d ' ' -f 1)" \
+            --allow-network --with-dagger
+      - name: Retain asset acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: vesryn-tool-runtime-asset-acceptance
+          path: |
+            ${{ runner.temp }}/asset-acceptance/acceptance.json
+            ${{ runner.temp }}/aria2-package.txt
+          if-no-files-found: warn
+          retention-days: 30
       - name: Retain versioned Python artifacts
         uses: actions/upload-artifact@v7.0.2
         with:

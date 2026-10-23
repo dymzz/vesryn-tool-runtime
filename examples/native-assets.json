@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "kind": "native-asset-example",
+  "reviewed_on": "2026-10-23",
+  "definitions": [
+    {
+      "asset_id": "hyperfine",
+      "catalog_revision": "official-2026-10-23",
+      "releases": [
+        {
+          "version": "2.0.0",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/sharkdp/hyperfine/releases/download/v2.0.0/hyperfine-v2.0.0-x86_64-pc-windows-msvc.zip",
+          "sha256": "3dec51acee1060908e67948838d6bc0a7aacde0774acebfa4afb220dcf0bc078",
+          "entrypoint": "hyperfine.exe",
+          "os": "windows",
+          "arch": "x86_64",
+          "abi": "msvc"
+        },
+        {
+          "version": "2.0.0",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/sharkdp/hyperfine/releases/download/v2.0.0/hyperfine-v2.0.0-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "ae2beda2ac99c098427e4f755244552daf20e514422889cca6d44421e2d93c87",
+          "entrypoint": "hyperfine",
+          "os": "linux",
+          "arch": "x86_64",
+          "abi": "gnu"
+        },
+        {
+          "version": "1.20.0",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-pc-windows-msvc.zip",
+          "sha256": "2508c549b049b1d4342d08edc1cb42bfac169082b6e3069431b5bab9822dbb32",
+          "entrypoint": "hyperfine.exe",
+          "os": "windows",
+          "arch": "x86_64",
+          "abi": "msvc"
+        },
+        {
+          "version": "1.20.0",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "63ad53934062118f5b0be11785e0bb1603d4b91667d1921f2fd8df9a8712040a",
+          "entrypoint": "hyperfine",
+          "os": "linux",
+          "arch": "x86_64",
+          "abi": "gnu"
+        }
+      ]
+    },
+    {
+      "asset_id": "osv-scanner",
+      "catalog_revision": "official-2026-10-23",
+      "releases": [
+        {
+          "version": "2.6.0",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64",
+          "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108",
+          "entrypoint": "osv-scanner",
+          "os": "linux",
+          "arch": "x86_64",
+          "abi": null
+        }
+      ]
+    }
+  ],
+  "provenance": [
+    {
+      "asset_id": "hyperfine",
+      "version": "2.0.0",
+      "artifact": "hyperfine-v2.0.0-x86_64-pc-windows-msvc.zip",
+      "release": "https://github.com/sharkdp/hyperfine/releases/tag/v2.0.0",
+      "release_id": 406169208,
+      "asset_id_on_github": 619834237,
+      "authority": "publisher GitHub Release asset digest",
+      "sha256": "3dec51acee1060908e67948838d6bc0a7aacde0774acebfa4afb220dcf0bc078"
+    },
+    {
+      "asset_id": "hyperfine",
+      "version": "2.0.0",
+      "artifact": "hyperfine-v2.0.0-x86_64-unknown-linux-gnu.tar.gz",
+      "release": "https://github.com/sharkdp/hyperfine/releases/tag/v2.0.0",
+      "release_id": 406169208,
+      "asset_id_on_github": 619831673,
+      "authority": "publisher GitHub Release asset digest",
+      "sha256": "ae2beda2ac99c098427e4f755244552daf20e514422889cca6d44421e2d93c87"
+    },
+    {
+      "asset_id": "hyperfine",
+      "version": "1.20.0",
+      "artifact": "hyperfine-v1.20.0-x86_64-pc-windows-msvc.zip",
+      "release": "https://github.com/sharkdp/hyperfine/releases/tag/v1.20.0",
+      "release_id": 263207623,
+      "asset_id_on_github": 317832313,
+      "authority": "publisher GitHub Release asset digest",
+      "sha256": "2508c549b049b1d4342d08edc1cb42bfac169082b6e3069431b5bab9822dbb32"
+    },
+    {
+      "asset_id": "hyperfine",
+      "version": "1.20.0",
+      "artifact": "hyperfine-v1.20.0-x86_64-unknown-linux-gnu.tar.gz",
+      "release": "https://github.com/sharkdp/hyperfine/releases/tag/v1.20.0",
+      "release_id": 263207623,
+      "asset_id_on_github": 317831911,
+      "authority": "publisher GitHub Release asset digest",
+      "sha256": "63ad53934062118f5b0be11785e0bb1603d4b91667d1921f2fd8df9a8712040a"
+    },
+    {
+      "asset_id": "osv-scanner",
+      "version": "2.6.0",
+      "artifact": "osv-scanner_linux_amd64",
+      "release": "https://github.com/google/osv-scanner/releases/tag/v2.6.0",
+      "release_id": 388118691,
+      "asset_id_on_github": 562414718,
+      "authority": "publisher GitHub Release asset digest",
+      "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
+    }
+  ]
+}

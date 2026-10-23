@@ -7,6 +7,9 @@ They are not present in the original released wheel. The issue reports a consume
 pin of `b3079be2331a19b9168fa7c8f26607bafc059cec`; this task does not inspect or
 update that consumer. Do not treat these source revisions as identical artifacts.
 
+The aria2 C backend is now described separately in [Native assets](native-assets.md).
+The boundaries and historical evidence below describe A's original delivery.
+
 ## Definitions and authority
 
 `AssetDefinition(asset_id, catalog_revision, releases)` is an immutable CLI release

@@ -32,12 +32,15 @@ from .contracts import (
 )
 from .documents import ToolRuntimeError
 from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_tool
+from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
 from .registry import compose, provider
 from .scope import DiscoveryScope
 from .uv_assets import UvLock, UvToolBackend
 
 __all__ = [
     "SELECTION_BINDING",
+    "Aria2NativeBackend",
+    "Aria2Source",
     "AssetDefinition",
     "AssetError",
     "AssetFile",
@@ -52,6 +55,7 @@ __all__ = [
     "DispatchReceipt",
     "ExecutionContext",
     "Invocation",
+    "NativeAssetDelivery",
     "ToolAdapter",
     "ToolResult",
     "ToolRuntime",

@@ -1,6 +1,6 @@
 [project]
 name = "vesryn-tool-runtime"
-version = "0.1.0"
+version = "0.2.0"
 description = "Independent tool contracts, discovery, binding and batch invocation"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -14,7 +14,7 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 wheel-exclude = ["**/AGENTS.md"]
-source-include = ["docs/**", "examples/**", "api/dagger.json", "api/pyproject.toml", "api/src/**/*.py", "tests/test_runtime.py", "tests/test_boundaries.py", "tests/test_assets.py", "tests/test_uv_assets.py", "tests/fixtures/**", "uv.lock"]
+source-include = ["docs/**", "examples/**", "api/dagger.json", "api/pyproject.toml", "api/src/**/*.py", "tests/test_runtime.py", "tests/test_boundaries.py", "tests/test_assets.py", "tests/test_uv_assets.py", "tests/test_native_assets.py", "tests/fixtures/**", "uv.lock"]
 
 [tool.uv.sources]
 vesryn-log = { git = "https://github.com/dymzz/vesryn-log.git", rev = "030c5a8edf820588e29f53803b6baaf53b1f6e57" }
