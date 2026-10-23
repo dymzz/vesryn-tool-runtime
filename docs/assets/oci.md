@@ -91,7 +91,9 @@ register_shared_definitions(catalog, records)
 
 # 4. Target platform resolution
 linux_target = TargetPlatform(os="linux", arch="x86_64", abi="gnu")
-view = catalog.asset_view("code.pattern-scan", target=linux_target, policy=ExecutionPolicy())
+view = catalog.asset_view(
+    "code.pattern-scan", target=linux_target, policy=ExecutionPolicy()
+)
 # view.selectable == True
 # view.release.sha256 == "374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d"
 ```
