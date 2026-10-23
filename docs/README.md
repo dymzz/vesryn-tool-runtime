@@ -8,10 +8,12 @@
 - [Dagger package delivery](dagger.md): fixed-revision wheel delivery for executors.
 - [CLI asset contracts](tool-assets.md): definitions, frozen version selections and local backend receipts/index.
 - [Native asset acquisition](native-assets.md): explicit aria2 preparation, repeated verification and File/Directory delivery.
+- [Shared asset definitions](shared-definitions.md): bundled shared-asset documents, identity mapping and B–E path ownership.
 - [TR-ASSET-01C delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md): issue #8 acceptance and evidence.
 - [uv tool environments](uv-tool-assets.md): issue #7 thin uv adapter, per-artifact environments and Linux lock description.
 - [0.2.0 / TR-ASSET-01 acceptance](tasks/vesryn-tool-runtime/P0-local-tool-assets.md): issue #5 joint verification and release criteria.
 - [TR-ASSET-01A delivery](tasks/vesryn-tool-runtime/P0-tool-asset-resolution.md): issue #6 scope, public handoff and directed acceptance.
+- [TR-ASSET-CI-01A delivery](tasks/vesryn-tool-runtime/P1-shared-asset-registration-foundation.md): issue #16 shared identity and explicit assembly foundation.
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): existing C1–C8 acceptance standard.
 - [0.1.0 extraction assessment](delivery/tool-runtime-0.1.0.md): actual evidence, statuses and publication boundary.

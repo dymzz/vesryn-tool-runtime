@@ -11,3 +11,6 @@ dist/
 .dagger/sdk/
 .tmp/
 /.tmp/
+.unregistered/
+/.unregistered/
+.agent/
