@@ -41,3 +41,13 @@
   [TR-001](delivery/tr-001-binding-admission.md).
 
 - Add a thin uv adapter (UvToolBackend) that delegates resolution, download and environments to uv, with per-artifact environments, shared receipts and a hashed Linux lock description. Acquisition and execution stay separately permitted. See [uv tool environments](uv-tool-assets.md).
+
+## Unreleased
+
+- Add the shared asset definition foundation for TR-ASSET-CI-01A (issue #16): a strict
+  shared-asset-definitions document format, a bundled per-group data directory and the
+  thin `shared_definition_documents`/`load_shared_definitions`/`register_shared_definitions`
+  entries over the existing Catalog. Tool/asset identity, Provider, Scope and Binding
+  semantics are unchanged; no second registry, installer or implicit loading is added.
+  See [shared asset definitions](shared-definitions.md) and the
+  [issue #16 delivery](tasks/vesryn-tool-runtime/P1-shared-asset-registration-foundation.md).

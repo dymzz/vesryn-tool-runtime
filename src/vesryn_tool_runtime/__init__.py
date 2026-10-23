@@ -35,6 +35,12 @@ from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_too
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
 from .registry import compose, provider
 from .scope import DiscoveryScope
+from .shared_definitions import (
+    SharedAssetDefinition,
+    load_shared_definitions,
+    register_shared_definitions,
+    shared_definition_documents,
+)
 from .uv_assets import UvLock, UvToolBackend
 
 __all__ = [
@@ -56,6 +62,7 @@ __all__ = [
     "ExecutionContext",
     "Invocation",
     "NativeAssetDelivery",
+    "SharedAssetDefinition",
     "ToolAdapter",
     "ToolResult",
     "ToolRuntime",
@@ -69,8 +76,11 @@ __all__ = [
     "compose",
     "create_binding",
     "invoke_tool",
+    "load_shared_definitions",
     "native_asset_directory",
     "provider",
+    "register_shared_definitions",
+    "shared_definition_documents",
     "verify_binding",
     "verify_document",
 ]
