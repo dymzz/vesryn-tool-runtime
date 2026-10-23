@@ -68,6 +68,18 @@ The [local combined evidence](../../verification/tr-asset-01.json) records the
 Windows installed-wheel run and real four-version batch separately from the
 required Linux/Dagger CI results. Its candidate hash is not a published artifact.
 
+Evidence reuse is explicit:
+
+| Class | Scope |
+| --- | --- |
+| Reused acceptance | A's resolver/snapshot/index semantics and C's three real Linux downloads, checksums, archive handling and offline hits retain their original versioned evidence. They are not counted as new #5 acceptance. |
+| Affected regression | The installed combined wheel's 130 passing cases include 128 existing cases and 2 new uv regressions. The unchanged A/C cases are compatibility regression, not new feature acceptance; Windows skips one additional symlink case. |
+| New #5 evidence | Published uv environments survive cache removal without rebuilding and obey current policy; a four-version admitted batch runs on Windows, including previously unexecuted Windows native artifacts; accepted-head CI establishes Linux Dagger File/Directory and uv-lock consumption. |
+
+After the required regressions pass, do not manually repeat unchanged A/C feature
+acceptance. Fresh CI runners may acquire their own declared artifacts; a Windows
+cache is not evidence that a Linux runner has those artifacts.
+
 ## C1–C8 release gates
 
 | Criterion | Required observable evidence |
