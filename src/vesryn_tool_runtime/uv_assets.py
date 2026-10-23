@@ -20,7 +20,7 @@ from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
 from .asset_index import AssetFile, AssetIndex, AssetReceipt
-from .assets import AssetError, AssetSelection
+from .assets import AssetError, AssetPolicy, AssetSelection, _contains
 from .contracts import ToolResult
 from .documents import digest
 
@@ -157,9 +157,15 @@ class UvToolBackend:
     # -- selection checks --------------------------------------------------------
 
     @staticmethod
-    def _check(selection):
-        if not isinstance(selection, AssetSelection):
+    def _check(selection, policy):
+        if not isinstance(selection, AssetSelection) or not isinstance(
+            policy, AssetPolicy
+        ):
             raise AssetError("invalid_selection")
+        if not policy.enabled:
+            raise AssetError("selection_disabled")
+        if not _contains(policy.specifier, selection.release.version):
+            raise AssetError("no_matching_version")
         release = selection.release
         if release.distribution != "python" or release.backend != "uv":
             raise AssetError("invalid_backend")
@@ -186,18 +192,45 @@ class UvToolBackend:
 
     # -- container-consumable description ---------------------------------------
 
-    def lock(self, selection, *, allow_network=False):
+    def lock(self, selection, *, policy, allow_network=False):
         """Resolve the full dependency set with ``uv pip compile`` for the target.
 
         ``tool==version`` is not a lock; the returned hashes cover every transitive
         artifact. The source wheel hash reported by uv must equal the frozen one.
         """
-        python_platform = self._check(selection)
+        self._check(selection, policy)
+        if type(allow_network) is not bool:
+            raise AssetError("invalid_policy")
+        directory = self._directory(selection)
+        directory.mkdir(parents=True, exist_ok=True)
+        try:
+            with FileLock(str(directory) + ".lock", timeout=self.index.timeout):
+                return self._lock(selection, policy, allow_network)
+        except Timeout:
+            raise AssetError("index_busy") from None
+
+    def _lock(self, selection, policy, allow_network):
+        python_platform = self._check(selection, policy)
         release = selection.release
         directory = self._directory(selection)
         directory.mkdir(parents=True, exist_ok=True)
         source = directory / "requirements.in"
         output = directory / "requirements.lock"
+        if (
+            self.index._read().get(selection.artifact_id, {}).get("installation")
+            is not None
+        ):
+            text = output.read_bytes().decode("utf-8")
+            self._check_source_hash(text, selection)
+            return UvLock(
+                selection.selection_id,
+                selection.artifact_id,
+                self.uv_version(),
+                python_platform,
+                selection.target.python,
+                text,
+                release.sha256,
+            )
         source.write_text(f"{release.package} @ {release.source}\n", encoding="utf-8")
         output.unlink(missing_ok=True)
         try:
@@ -255,21 +288,23 @@ class UvToolBackend:
 
     # -- preparation on this host ------------------------------------------------
 
-    def prepare(self, selection, *, allow_network=False):
+    def prepare(self, selection, *, policy, allow_network=False):
         """Build this selection's own uv environment and record the actual outcome.
 
         ``allow_network`` is the acquisition permission only; it never permits
         running the tool. Without it uv runs ``--offline`` and a missing artifact
         is a recorded failure. Unsupported hosts raise before anything is touched.
         """
-        self._check(selection)
+        self._check(selection, policy)
+        if type(allow_network) is not bool:
+            raise AssetError("invalid_policy")
         if _host() != (selection.target.os, selection.target.arch):
             raise AssetError("unsupported_target")
         directory = self._directory(selection)
         directory.mkdir(parents=True, exist_ok=True)
         try:
             with FileLock(str(directory) + ".lock", timeout=self.index.timeout):
-                receipt = self._build(selection, allow_network)
+                receipt = self._build(selection, policy, allow_network)
         except Timeout:
             raise AssetError("index_busy") from None
         return self.index.record(receipt)
@@ -282,12 +317,30 @@ class UvToolBackend:
             ),
         )
 
-    def _build(self, selection, allow_network):
+    def _build(self, selection, policy, allow_network):
         release = selection.release
         directory = self._directory(selection)
         environment = self._environment(selection)
+        previous = self.index._read().get(selection.artifact_id, {}).get("installation")
+        if previous is not None:
+            fact = self.installed(selection, policy=policy)
+            if fact["status"] != "present":
+                return self._failure(
+                    selection, "failed", 1, fact.get("reason", "local_missing")
+                )
+            original = AssetReceipt.from_document(previous)
+            return AssetReceipt(
+                selection,
+                ToolResult(
+                    "passed", 0, executed=True, complete=True, current=True, reused=True
+                ),
+                locator=fact["locator"],
+                files=original.files,
+                environment_id=fact["environment_id"],
+                verified_source_sha256=release.sha256,
+            )
         try:
-            locked = self.lock(selection, allow_network=allow_network)
+            locked = self._lock(selection, policy, allow_network)
         except AssetError as error:
             if error.code in {"backend_unavailable"}:
                 return self._failure(
@@ -414,13 +467,13 @@ class UvToolBackend:
 
     # -- later facts and location ------------------------------------------------
 
-    def installed(self, selection):
+    def installed(self, selection, *, policy):
         """The index fact, plus a re-check that the live environment is still whole.
 
         A cleared uv cache or damaged environment is reported as such instead of the
         last successful receipt. This never repairs or downloads anything.
         """
-        self._check(selection)
+        self._check(selection, policy)
         fact = self.index.installed(selection)
         if fact["status"] != "present":
             return fact
@@ -441,20 +494,21 @@ class UvToolBackend:
 
     def _recorded_lock(self, selection):
         text = (self._directory(selection) / "requirements.lock").read_bytes()
+        self._check_source_hash(text.decode("utf-8"), selection)
         return hashlib.sha256(text).hexdigest()
 
-    def command(self, catalog, selection, *, scope):
+    def command(self, catalog, selection, *, scope, policy):
         """Return the verified entry executable for a separately admitted host.
 
         Acquisition permission is not execution permission: the host's scope must
         admit the tool. PATH and other installed versions are never consulted.
         """
-        self._check(selection)
+        self._check(selection, policy)
         spec = catalog.resolve(selection.tool_id, scope=scope)[0]
         scope.admit(spec)
         if spec.sha256 != selection.tool_contract_sha256:
             raise AssetError("selection_stale")
-        fact = self.installed(selection)
+        fact = self.installed(selection, policy=policy)
         if fact["status"] != "present":
             raise AssetError(fact.get("reason", "local_missing"))
         entry = self._entry_path(

@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "kind": "tr-asset-01-local-preparation",
+  "version": "0.2.0",
+  "date": "2026-10-23",
+  "candidate_only": true,
+  "wheel_sha256": "30a6d0d7a0e66955e1b38d5360f30acebb42acbfd0b6fc0728e260407ccf346a",
+  "installed_directed_tests": {
+    "passed": 130,
+    "skipped": 1,
+    "skip_reason": "Windows file symlink privilege unavailable"
+  },
+  "independent_installed_wheel": true,
+  "consumer_packages_absent": true,
+  "python_files_match_source": 13,
+  "private_directories_absent": true,
+  "real_windows_version_calls": {
+    "hyperfine.version-2.0.0": {
+      "status": "passed",
+      "exit_code": 0,
+      "outputs": {
+        "version": "hyperfine 2.0.0"
+      },
+      "executed": true,
+      "complete": true,
+      "current": true,
+      "reused": false,
+      "report_generated": false,
+      "reason": null
+    },
+    "hyperfine.version-1.20.0": {
+      "status": "passed",
+      "exit_code": 0,
+      "outputs": {
+        "version": "hyperfine 1.20.0"
+      },
+      "executed": true,
+      "complete": true,
+      "current": true,
+      "reused": false,
+      "report_generated": false,
+      "reason": null
+    },
+    "vulture.version-2.16": {
+      "status": "passed",
+      "exit_code": 0,
+      "outputs": {
+        "version": "vulture 2.16"
+      },
+      "executed": true,
+      "complete": true,
+      "current": true,
+      "reused": false,
+      "report_generated": false,
+      "reason": null
+    },
+    "vulture.version-2.14": {
+      "status": "passed",
+      "exit_code": 0,
+      "outputs": {
+        "version": "vulture 2.14"
+      },
+      "executed": true,
+      "complete": true,
+      "current": true,
+      "reused": false,
+      "report_generated": false,
+      "reason": null
+    }
+  },
+  "offline_assets": 4,
+  "linux_lock_sha256": "428e2c3dad875c4930f291c9f0d210575796dbea4cfbee96d42a089226328283",
+  "uv_version": "0.12.23",
+  "uv_signatures": {
+    "lock": "(self, selection, *, policy, allow_network=False)",
+    "prepare": "(self, selection, *, policy, allow_network=False)",
+    "installed": "(self, selection, *, policy)",
+    "command": "(self, catalog, selection, *, scope, policy)"
+  },
+  "dagger_status": "not established by this local record; accepted-head CI and Release provenance are authoritative",
+  "publication_status": "not established by this local candidate"
+}

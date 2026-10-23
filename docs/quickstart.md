@@ -1,7 +1,9 @@
 # Quickstart
 
-Python 3.14+ is required. Build `vesryn-tool-runtime==0.1.0` with `uv build` and
-install its wheel together with `jsonschema==4.26.0` and `vesryn-log==0.1.0`.
+Python 3.14+ is required. Build `vesryn-tool-runtime==0.2.0` with `uv build` and
+install its wheel with normal dependency resolution. Its runtime dependencies are
+`filelock==3.20.3`, `jsonschema==4.26.0`, `packaging==26.3`, and
+`vesryn-log>=0.1.0,<0.2.0`.
 If using the private Git source, the development manifest pins vesryn-log to
 `030c5a8edf820588e29f53803b6baaf53b1f6e57`; supply Git access through your existing
 credential mechanism. Wheels declare ordinary versioned dependencies, without

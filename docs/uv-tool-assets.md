@@ -2,11 +2,14 @@
 
 Public handoff for [issue #7](https://github.com/dymzz/vesryn-tool-runtime/issues/7),
 built on the [asset contracts](tool-assets.md) delivered by issue #6. These APIs are
-unreleased additions after source revision `f60eadd` (version `0.1.0`).
+delivered in version `0.2.0`, after the #6 baseline `f60eadd`. The original
+`0.1.0` wheel does not contain these APIs.
 
 `UvToolBackend` is a thin adapter. **uv** resolves, downloads, verifies hashes,
 caches and builds the environment. This package never walks or edits uv's cache, has
 no resolver and adds no service, database or scheduler.
+uv 0.12.23 is the verified acquisition toolchain; compatibility with other uv
+versions is not established by this release's evidence.
 
 ## Public signatures
 
@@ -16,14 +19,18 @@ Exported from `vesryn_tool_runtime`:
 UvToolBackend(index: AssetIndex, *, uv="uv", find_links=(), index_url=None,
               timeout=900, runner=subprocess.run)
 UvToolBackend.uv_version() -> str
-UvToolBackend.lock(selection, *, allow_network=False) -> UvLock
-UvToolBackend.prepare(selection, *, allow_network=False) -> dict   # AssetReceipt.document()
-UvToolBackend.installed(selection) -> dict
-UvToolBackend.command(catalog, selection, *, scope) -> tuple[str, ...]
+UvToolBackend.lock(selection, *, policy, allow_network=False) -> UvLock
+UvToolBackend.prepare(selection, *, policy, allow_network=False) -> dict   # AssetReceipt.document()
+UvToolBackend.installed(selection, *, policy) -> dict
+UvToolBackend.command(catalog, selection, *, scope, policy) -> tuple[str, ...]
 UvLock.document() -> dict
 ```
 
 Only `python` / `uv` releases (`AssetRelease.distribution/backend`) are accepted.
+Every operation requires the host's current `AssetPolicy`. Disablement and current
+version restrictions apply even to an older frozen selection and an offline hit.
+These required arguments refine the unreleased #7 prototype; no released 0.1 API
+changes. The historical #7 JSON records the prototype's original signatures.
 
 ## Two different results
 
@@ -45,6 +52,12 @@ it with `uv pip install --require-hashes -r`; a Windows `.venv` is never copied.
   the environment another selection points at. Project dependencies and the project
   `uv.lock` are never read or written, and the tool is not installed into a consumer
   `.venv`.
+- **Frozen environment reuse.** A verified installed environment and its original
+  hashed lock are reused, including after uv's cache and source wheels are removed.
+  Repeated preparation does not resolve again or delete/recreate that environment.
+  A public `lock` call also retains a published environment's lock. A damaged or
+  missing published environment reports failure and is not silently replaced;
+  hosts own explicit recovery. Unpublished partial attempts remain separate facts.
 - **Acquisition vs execution.** `allow_network=False` (default) runs uv `--offline`.
   It is the acquisition permission only. `command` additionally requires
   `scope.admit(spec)` and an unchanged tool contract hash. Preparation never executes
@@ -73,7 +86,11 @@ vulture 2.16 and 2.14 wheels from PyPI and requests a Linux x86_64 lock. Recorde
 [verification/tr-asset-01b.json](verification/tr-asset-01b.json). Tests in
 `tests/test_uv_assets.py` use the real uv executable with hand-built wheels.
 
-Not verified here: executing the lock inside Dagger/Linux, the ECI consumer, macOS,
+The #5 [joint acceptance](tasks/vesryn-tool-runtime/P0-local-tool-assets.md) adds
+real native/Python version calls, offline reuse and public Dagger File/Directory
+and Linux lock consumption. Its current CI artifacts identify actual outcomes.
+
+Not verified by the historical #7 evidence: executing the lock inside Dagger/Linux, the ECI consumer, macOS,
 and Harness-Python compatibility. Semgrep stays OCI and is not handled by this
 backend. Offline preparation of a dependency set relies on uv's cache or
 `find_links`; a single `uvx` cache hit is not evidence of permanent offline

@@ -2,8 +2,8 @@
 
 This is the public handoff for [issue #8](https://github.com/dymzz/vesryn-tool-runtime/issues/8),
 TR-ASSET-01C, based on the [asset contracts](tool-assets.md) merged in source
-`f60eadd`. The source package still declares version 0.1.0; these additions are
-not present in the original published wheel. No consumer pin is changed here.
+`f60eadd`. These additions are delivered in 0.2.0 and are not present in the
+original 0.1.0 wheel. No consumer pin is changed here.
 
 ## Public entry points
 
@@ -28,6 +28,13 @@ and delivery, including reuse: a frozen old selection cannot override current
 disablement or an allowed-version constraint. Acquiring a tool, passing verification,
 or obtaining its path never admits a business invocation. The consumer's existing
 ToolAdapter, Binding and explicit host Scope retain execution ownership.
+
+On Windows, a versioned archive entry can exceed 260 characters. Its consumer
+Adapter should pass the program explicitly, for example
+`subprocess.run([str(delivery.executable), "--version"], executable=str(delivery.executable))`.
+Leaving Windows `CreateProcessW.lpApplicationName` implicit retains a MAX_PATH
+limit even with an extended path prefix. The acceptance example verifies explicit
+launch of both real Hyperfine versions; no global registry setting is changed.
 
 The backend supports raw ELF/PE binaries, ZIP, and tar archives (`.tar`, `.tar.gz`,
 `.tgz`, `.tar.xz`, `.tar.bz2`, `.tar.zst`), identified by the trusted source URL's

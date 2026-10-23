@@ -10,6 +10,7 @@
 - [Native asset acquisition](native-assets.md): explicit aria2 preparation, repeated verification and File/Directory delivery.
 - [TR-ASSET-01C delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md): issue #8 acceptance and evidence.
 - [uv tool environments](uv-tool-assets.md): issue #7 thin uv adapter, per-artifact environments and Linux lock description.
+- [0.2.0 / TR-ASSET-01 acceptance](tasks/vesryn-tool-runtime/P0-local-tool-assets.md): issue #5 joint verification and release criteria.
 - [TR-ASSET-01A delivery](tasks/vesryn-tool-runtime/P0-tool-asset-resolution.md): issue #6 scope, public handoff and directed acceptance.
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): existing C1–C8 acceptance standard.

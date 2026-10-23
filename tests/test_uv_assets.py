@@ -129,13 +129,16 @@ def test_prepare_runs_exact_version_without_touching_project_files(tmp_path, bac
     selection = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
 
     assert backend.index.installed(selection)["status"] == "missing"
-    receipt = backend.prepare(selection)
+    receipt = backend.prepare(selection, policy=POLICY)
     scope = DiscoveryScope(permissions=frozenset({"check"}))
-    command = backend.command(tools, selection, scope=scope)
+    command = backend.command(tools, selection, scope=scope, policy=POLICY)
 
     assert receipt["outcome"]["status"] == "passed"
     assert receipt["verified_source_sha256"] == sha
-    assert receipt["environment_id"] == backend.installed(selection)["environment_id"]
+    assert (
+        receipt["environment_id"]
+        == backend.installed(selection, policy=POLICY)["environment_id"]
+    )
     assert entry_version(command) == "vtr_cli-1.0"
     assert (project / "pyproject.toml").read_bytes() == before
 
@@ -149,13 +152,22 @@ def test_two_versions_coexist_and_stay_selected(tmp_path, backend):
     old = tools.select_asset("vtr.check", target=TARGET, policy=POLICY, version="1.0")
     new = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
     scope = DiscoveryScope(permissions=frozenset({"check"}))
-    backend.prepare(old)
-    backend.prepare(new)
+    backend.prepare(old, policy=POLICY)
+    backend.prepare(new, policy=POLICY)
 
     assert new.release.version == "2.0"
-    assert entry_version(backend.command(tools, old, scope=scope)) == "vtr_cli-1.0"
-    assert entry_version(backend.command(tools, new, scope=scope)) == "vtr_cli-2.0"
-    assert backend.installed(old)["locator"] != backend.installed(new)["locator"]
+    assert (
+        entry_version(backend.command(tools, old, scope=scope, policy=POLICY))
+        == "vtr_cli-1.0"
+    )
+    assert (
+        entry_version(backend.command(tools, new, scope=scope, policy=POLICY))
+        == "vtr_cli-2.0"
+    )
+    assert (
+        backend.installed(old, policy=POLICY)["locator"]
+        != backend.installed(new, policy=POLICY)["locator"]
+    )
 
 
 def test_offline_reuse_and_missing_dependency_fails_truthfully(tmp_path, backend):
@@ -170,8 +182,8 @@ def test_offline_reuse_and_missing_dependency_fails_truthfully(tmp_path, backend
     tools = catalog(release(path, sha, "1.0"))
     selection = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
 
-    assert backend.prepare(selection)["outcome"]["status"] == "passed"
-    assert backend.installed(selection)["status"] == "present"
+    assert backend.prepare(selection, policy=POLICY)["outcome"]["status"] == "passed"
+    assert backend.installed(selection, policy=POLICY)["status"] == "present"
     shutil.rmtree(tmp_path / "wheels")  # dependency no longer obtainable anywhere
 
     missing = tools.select_asset(
@@ -181,11 +193,11 @@ def test_offline_reuse_and_missing_dependency_fails_truthfully(tmp_path, backend
         AssetIndex(tmp_path / "fresh"), find_links=(tmp_path / "wheels",)
     )
     # The source wheel is gone too, so a fresh offline preparation must fail.
-    receipt = other.prepare(missing)
+    receipt = other.prepare(missing, policy=POLICY)
     assert receipt["outcome"]["status"] == "failed"
     assert other.index.installed(missing)["status"] == "missing"
     # The prepared environment is self-contained and still works offline.
-    assert backend.installed(selection)["status"] == "present"
+    assert backend.installed(selection, policy=POLICY)["status"] == "present"
 
 
 def test_cleared_cache_and_deleted_environment_are_not_reported_ready(
@@ -194,11 +206,13 @@ def test_cleared_cache_and_deleted_environment_are_not_reported_ready(
     path, sha = wheel(tmp_path / "wheels", "vtr_cli", "1.0", script="vtr-cli")
     tools = catalog(release(path, sha, "1.0"))
     selection = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
-    backend.prepare(selection)
+    backend.prepare(selection, policy=POLICY)
     shutil.rmtree(uv_cache, ignore_errors=True)
-    assert backend.installed(selection)["status"] == "present"  # env is self-contained
-    shutil.rmtree(Path(backend.installed(selection)["locator"]))
-    assert backend.installed(selection)["status"] == "missing"
+    assert (
+        backend.installed(selection, policy=POLICY)["status"] == "present"
+    )  # env is self-contained
+    shutil.rmtree(Path(backend.installed(selection, policy=POLICY)["locator"]))
+    assert backend.installed(selection, policy=POLICY)["status"] == "missing"
 
 
 def test_failures_unsupported_targets_and_mismatch_keep_facts(tmp_path, backend):
@@ -206,19 +220,19 @@ def test_failures_unsupported_targets_and_mismatch_keep_facts(tmp_path, backend)
     bad = release(path, "0" * 64, "1.0")
     tools = catalog(bad)
     selection = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
-    receipt = backend.prepare(selection)
+    receipt = backend.prepare(selection, policy=POLICY)
     assert receipt["outcome"]["status"] == "failed"
     assert backend.index.installed(selection)["status"] == "missing"
 
     other_os = "linux" if OS != "linux" else "windows"
     foreign = replace(selection, target=AssetTarget(other_os, ARCH, python=PYTHON))
     with pytest.raises(AssetError) as error:
-        backend.prepare(foreign)
+        backend.prepare(foreign, policy=POLICY)
     assert error.value.code == "unsupported_target"
 
     wrong = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
     wrong = replace(wrong, release=release(path, sha, "2.0"), version=None)
-    assert backend.prepare(wrong)["outcome"]["status"] == "failed"
+    assert backend.prepare(wrong, policy=POLICY)["outcome"]["status"] == "failed"
     assert backend.index.installed(wrong)["status"] == "missing"
 
 
@@ -234,14 +248,17 @@ def test_discovery_does_not_prepare_and_execution_needs_its_own_admission(
     assert view["installed"]["status"] == "missing"
     assert not (backend.root / "uv").exists()
 
-    backend.prepare(selection)
+    backend.prepare(selection, policy=POLICY)
     with pytest.raises(WorkflowError):
         backend.command(
-            tools, selection, scope=DiscoveryScope()
+            tools, selection, scope=DiscoveryScope(), policy=POLICY
         )  # no admitted permission
     with pytest.raises(WorkflowError):
         backend.command(
-            tools, selection, scope=DiscoveryScope(permissions=frozenset({"read"}))
+            tools,
+            selection,
+            scope=DiscoveryScope(permissions=frozenset({"read"})),
+            policy=POLICY,
         )
 
 
@@ -250,7 +267,7 @@ def test_lock_describes_target_linux_for_containers(tmp_path, backend):
     tools = catalog(release(path, sha, "1.0"))
     linux = AssetTarget("linux", "x86_64", python=PYTHON)
     selection = tools.select_asset("vtr.check", target=linux, policy=POLICY)
-    lock = backend.lock(selection)
+    lock = backend.lock(selection, policy=POLICY)
     document = lock.document()
 
     assert document["python_platform"] == "x86_64-unknown-linux-gnu"
@@ -260,3 +277,55 @@ def test_lock_describes_target_linux_for_containers(tmp_path, backend):
     assert not (
         backend.root / "uv" / f"artifact-{selection.artifact_id}" / "venv"
     ).exists()
+
+
+def test_prepared_environment_reuses_its_frozen_lock_after_cache_is_cleared(
+    tmp_path, backend, uv_cache, monkeypatch
+):
+    path, sha = wheel(tmp_path / "wheels", "vtr_cli", "1.0", script="vtr-cli")
+    tools = catalog(release(path, sha, "1.0"))
+    selection = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
+    first = backend.prepare(selection, policy=POLICY)
+    scope = DiscoveryScope(permissions=frozenset({"check"}))
+    command = backend.command(tools, selection, scope=scope, policy=POLICY)
+    before = Path(command[0]).stat().st_mtime_ns
+    frozen = backend.lock(selection, policy=POLICY).requirements
+    shutil.rmtree(uv_cache, ignore_errors=True)
+    shutil.rmtree(tmp_path / "wheels")
+    original = backend._uv
+
+    def no_rebuild(*args, **kwargs):
+        assert args[0] != "venv"
+        assert args[:2] not in {("pip", "compile"), ("pip", "install")}
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(backend, "_uv", no_rebuild)
+    again = backend.prepare(selection, policy=POLICY)
+    assert again["outcome"]["status"] == "passed"
+    assert again["environment_id"] == first["environment_id"]
+    assert Path(command[0]).stat().st_mtime_ns == before
+    assert backend.lock(selection, policy=POLICY).requirements == frozen
+    assert entry_version(command) == "vtr_cli-1.0"
+
+
+def test_current_disable_and_version_policy_apply_to_old_uv_snapshots(
+    tmp_path, backend
+):
+    path, sha = wheel(tmp_path / "wheels", "vtr_cli", "1.0", script="vtr-cli")
+    tools = catalog(release(path, sha, "1.0"))
+    selection = tools.select_asset("vtr.check", target=TARGET, policy=POLICY)
+    for policy, reason in [
+        (AssetPolicy("disabled-now", enabled=False), "selection_disabled"),
+        (AssetPolicy("restricted-now", specifier=">2"), "no_matching_version"),
+    ]:
+        for operation in (backend.lock, backend.prepare, backend.installed):
+            with pytest.raises(AssetError, match=reason):
+                operation(selection, policy=policy)
+        with pytest.raises(AssetError, match=reason):
+            backend.command(
+                tools,
+                selection,
+                scope=DiscoveryScope(permissions=frozenset({"check"})),
+                policy=policy,
+            )
+    assert not backend.root.exists()

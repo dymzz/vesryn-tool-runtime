@@ -7,7 +7,7 @@ discovery, Selection Binding Schema 1, admission and batch invocation. Python 3.
 
 Start with [the documentation index](docs/README.md), including the runnable
 [quickstart](docs/quickstart.md), [public API](docs/python-api.md) and
-[delivery evidence](docs/delivery/tool-runtime-0.1.0.md).
+[0.2.0 readiness and joint acceptance](docs/tasks/vesryn-tool-runtime/P0-local-tool-assets.md).
 
 The package owns tools, not workflows. Adapters keep their execution backends;
 consumers keep workflow state, checkpoint storage, recovery and domain policy.

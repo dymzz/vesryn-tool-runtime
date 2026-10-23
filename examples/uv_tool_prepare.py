@@ -81,8 +81,8 @@ def example():
                 policy=policy,
                 version=version,
             )
-            receipt = backend.prepare(selection, allow_network=True)
-            command = backend.command(tools, selection, scope=scope)
+            receipt = backend.prepare(selection, allow_network=True, policy=policy)
+            command = backend.command(tools, selection, scope=scope, policy=policy)
             shown = subprocess.run(
                 [*command, "--version"], capture_output=True, text=True, check=True
             ).stdout.strip()
@@ -98,7 +98,7 @@ def example():
             policy=policy,
             version="2.16",
         )
-        lock = backend.lock(linux, allow_network=True).document()
+        lock = backend.lock(linux, allow_network=True, policy=policy).document()
         yield {
             "linux_lock": {**lock, "requirements": lock["requirements"].splitlines()}
         }
