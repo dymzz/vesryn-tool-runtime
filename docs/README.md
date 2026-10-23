@@ -7,6 +7,7 @@
 - [Provider and Dagger integration](providers.md): explicit loading and execution boundaries.
 - [Dagger package delivery](dagger.md): fixed-revision wheel delivery for executors.
 - [CLI asset contracts](tool-assets.md): definitions, frozen version selections and local backend receipts/index.
+- [uv tool environments](uv-tool-assets.md): issue #7 thin uv adapter, per-artifact environments and Linux lock description.
 - [TR-ASSET-01A delivery](tasks/vesryn-tool-runtime/P0-tool-asset-resolution.md): issue #6 scope, public handoff and directed acceptance.
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): existing C1–C8 acceptance standard.

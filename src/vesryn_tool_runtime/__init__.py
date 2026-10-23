@@ -34,6 +34,7 @@ from .documents import ToolRuntimeError
 from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_tool
 from .registry import compose, provider
 from .scope import DiscoveryScope
+from .uv_assets import UvLock, UvToolBackend
 
 __all__ = [
     "SELECTION_BINDING",
@@ -56,6 +57,8 @@ __all__ = [
     "ToolRuntime",
     "ToolRuntimeError",
     "ToolSpec",
+    "UvLock",
+    "UvToolBackend",
     "asset_root",
     "canonical_binding",
     "checked_result",
