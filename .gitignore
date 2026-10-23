@@ -9,3 +9,5 @@ __pycache__/
 dist/
 .log/
 .dagger/sdk/
+.tmp/
+/.tmp/

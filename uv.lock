@@ -225,7 +225,9 @@ name = "vesryn-tool-runtime"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "filelock" },
     { name = "jsonschema" },
+    { name = "packaging" },
     { name = "vesryn-log" },
 ]
 
@@ -237,7 +239,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "filelock", specifier = "==3.20.3" },
     { name = "jsonschema", specifier = "==4.26.0" },
+    { name = "packaging", specifier = "==26.3" },
     { name = "vesryn-log", git = "https://github.com/dymzz/vesryn-log.git?rev=030c5a8edf820588e29f53803b6baaf53b1f6e57" },
 ]
 

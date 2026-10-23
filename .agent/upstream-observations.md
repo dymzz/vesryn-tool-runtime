@@ -37,3 +37,11 @@ observations remain in the consumer's `.agent/upstream-observations.md`.
   cache, `.test-tools`, `.codex` and virtual environments were absent.
 - The local cache is needed by the restricted executor. Artifacts are inspected
   directly; no upstream code or global cache configuration is modified.
+
+- Rechecked on 2026-10-23 for issue #6: uv 0.12.23 emitted the same local-cache
+  inclusion warning. The candidate wheel SHA-256
+  `2d01aa4a9113937bea91c6865438db0070fcf28f5f9f6d9fff19051695b29a33`
+  was inspected directly: work/cache/personal directories were absent and all
+  Python package bytes matched the current source. Its isolated installed-wheel
+  run passed 74 directed tests. This is additional evidence for the existing
+  diagnostic limitation, not a new upstream packaging defect.

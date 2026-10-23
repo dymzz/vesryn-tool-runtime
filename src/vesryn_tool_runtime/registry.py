@@ -62,4 +62,13 @@ def scoped_catalog(catalog, scope):
         result.register(spec, guarded)
         result._providers[spec.tool_id] = catalog.provider_for(spec.tool_id)
     result.discovery_scope = scope
+    for definition in catalog._assets.values():
+        result.register_asset(
+            definition,
+            tools=tuple(
+                name
+                for name, asset_id in catalog._tool_assets.items()
+                if asset_id == definition.asset_id
+            ),
+        )
     return result
