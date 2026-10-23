@@ -93,9 +93,7 @@ register_shared_definitions(catalog, records)
 # 4. Target platform resolution
 linux_target = AssetTarget(os="linux", arch="x86_64", abi="gnu")
 policy = AssetPolicy("consumer-approved-1")
-view = catalog.asset_view(
-    "code.pattern-scan", target=linux_target, policy=policy
-)
+view = catalog.asset_view("code.pattern-scan", target=linux_target, policy=policy)
 assert view["selection_status"] == "selectable"
 selection = catalog.select_asset(
     "code.pattern-scan", target=linux_target, policy=policy
