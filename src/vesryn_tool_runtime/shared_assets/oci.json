@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "kind": "shared-asset-definitions",
+  "assets": [
+    {
+      "asset_id": "semgrep",
+      "catalog_revision": "official-2026-10-24",
+      "tools": ["code.pattern-scan"],
+      "releases": [
+        {
+          "version": "1.99.0",
+          "distribution": "oci",
+          "backend": "oci",
+          "source": "docker.io/semgrep/semgrep@sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d",
+          "sha256": "374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d",
+          "entrypoint": "semgrep",
+          "os": "linux",
+          "arch": "x86_64"
+        },
+        {
+          "version": "1.99.0",
+          "distribution": "oci",
+          "backend": "oci",
+          "source": "docker.io/semgrep/semgrep@sha256:08f1c44024049d1a104f57203dab60b3579f17a12fe87bac7bb60130bbc46bfc",
+          "sha256": "08f1c44024049d1a104f57203dab60b3579f17a12fe87bac7bb60130bbc46bfc",
+          "entrypoint": "semgrep",
+          "os": "linux",
+          "arch": "aarch64"
+        }
+      ]
+    },
+    {
+      "asset_id": "lychee",
+      "catalog_revision": "official-2026-10-24",
+      "tools": ["docs.link-check"],
+      "releases": [
+        {
+          "version": "0.18.0",
+          "distribution": "oci",
+          "backend": "oci",
+          "source": "docker.io/lycheeverse/lychee@sha256:606c60a7f61ab802297973d1bd9a429c88c4b99596a23bfe34e63a46b6d40fc8",
+          "sha256": "606c60a7f61ab802297973d1bd9a429c88c4b99596a23bfe34e63a46b6d40fc8",
+          "entrypoint": "lychee",
+          "os": "linux",
+          "arch": "x86_64"
+        },
+        {
+          "version": "0.18.0",
+          "distribution": "oci",
+          "backend": "oci",
+          "source": "docker.io/lycheeverse/lychee@sha256:b1be296f112676caac52748c7f692eacde9a26fa23f8715b5662af9ad7dd451c",
+          "sha256": "b1be296f112676caac52748c7f692eacde9a26fa23f8715b5662af9ad7dd451c",
+          "entrypoint": "lychee",
+          "os": "linux",
+          "arch": "aarch64"
+        }
+      ]
+    }
+  ]
+}
