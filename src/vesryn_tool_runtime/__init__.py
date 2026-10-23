@@ -35,6 +35,7 @@ from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_too
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
 from .registry import compose, provider
 from .scope import DiscoveryScope
+from .uv_assets import UvLock, UvToolBackend
 
 __all__ = [
     "SELECTION_BINDING",
@@ -60,6 +61,8 @@ __all__ = [
     "ToolRuntime",
     "ToolRuntimeError",
     "ToolSpec",
+    "UvLock",
+    "UvToolBackend",
     "asset_root",
     "canonical_binding",
     "checked_result",
