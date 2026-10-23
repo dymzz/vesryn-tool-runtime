@@ -55,20 +55,19 @@
     },
     {
       "asset_id": "osv-scanner",
-      "catalog_revision": "official-2026-10-23",
-      "releases": [
-        {
-          "version": "2.6.0",
-          "distribution": "native",
-          "backend": "aria2",
-          "source": "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64",
-          "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108",
-          "entrypoint": "osv-scanner",
-          "os": "linux",
-          "arch": "x86_64",
-          "abi": null
-        }
-      ]
+      "shared_document": "native.json"
+    },
+    {
+      "asset_id": "actionlint",
+      "shared_document": "native.json"
+    },
+    {
+      "asset_id": "shellcheck",
+      "shared_document": "native.json"
+    },
+    {
+      "asset_id": "zizmor",
+      "shared_document": "native.json"
     }
   ],
   "provenance": [
@@ -118,9 +117,11 @@
       "artifact": "osv-scanner_linux_amd64",
       "release": "https://github.com/google/osv-scanner/releases/tag/v2.6.0",
       "release_id": 388118691,
-      "asset_id_on_github": 562414718,
+      "asset_id_on_github": 562414518,
       "authority": "publisher GitHub Release asset digest",
-      "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
+      "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108",
+      "rechecked_on": "2026-10-24",
+      "declaration": "shared_assets/native.json"
     }
   ]
 }

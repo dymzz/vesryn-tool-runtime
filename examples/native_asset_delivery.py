@@ -14,6 +14,7 @@ from vesryn_tool_runtime import (
     AssetTarget,
     Catalog,
     ToolSpec,
+    load_shared_definitions,
 )
 
 
@@ -27,14 +28,20 @@ def example_catalog():
         tool_id = value["asset_id"] + ".example"
         # Consumers supply the actual execution Adapter and capability contract.
         catalog.register(ToolSpec(tool_id, {}, {}), None)
-        catalog.register_asset(
-            AssetDefinition(
+        if "shared_document" in value:
+            # Release authority lives in the bundled shared definition document.
+            definition = next(
+                record.definition
+                for record in load_shared_definitions(value["shared_document"])
+                if record.definition.asset_id == value["asset_id"]
+            )
+        else:
+            definition = AssetDefinition(
                 value["asset_id"],
                 value["catalog_revision"],
                 tuple(AssetRelease(**release) for release in value["releases"]),
-            ),
-            tools=(tool_id,),
-        )
+            )
+        catalog.register_asset(definition, tools=(tool_id,))
     return catalog
 
 
@@ -51,7 +58,11 @@ def dagger_file(dag, delivery):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--asset", choices=("hyperfine", "osv-scanner"), required=True)
+    parser.add_argument(
+        "--asset",
+        choices=("hyperfine", "osv-scanner", "actionlint", "shellcheck", "zizmor"),
+        required=True,
+    )
     parser.add_argument("--version", required=True)
     parser.add_argument("--os", choices=("linux", "windows"), required=True)
     parser.add_argument("--arch", default="x86_64")
