@@ -48,8 +48,9 @@ def release(version="2.0", **changes):
     return value
 
 
-def asset(asset_id="shared.cli", revision="published-1", tools=("shared.read",),
-          releases=None):
+def asset(
+    asset_id="shared.cli", revision="published-1", tools=("shared.read",), releases=None
+):
     return {
         "asset_id": asset_id,
         "catalog_revision": revision,
@@ -96,7 +97,9 @@ def test_read_is_pure_and_needs_no_catalog_or_consumer_environment(tmp_path):
     assert load_shared_definitions(str(path)) == records
 
 
-def test_bundled_documents_load_and_bundled_names_take_precedence(tmp_path, monkeypatch):
+def test_bundled_documents_load_and_bundled_names_take_precedence(
+    tmp_path, monkeypatch
+):
     names = shared_definition_documents()
     assert names and names == tuple(sorted(names)) and len(set(names)) == len(names)
     assert "examples.json" in names
@@ -143,7 +146,9 @@ def test_assembly_reuses_existing_registration_and_conflict_reasons(tmp_path):
         register_shared_definitions(tools, ("not-a-record",))
 
 
-def test_one_asset_serves_many_capabilities_and_ids_survive_publication_changes(tmp_path):
+def test_one_asset_serves_many_capabilities_and_ids_survive_publication_changes(
+    tmp_path,
+):
     records = load_shared_definitions(
         store(tmp_path, document(asset(tools=("shared.read", "shared.scan"))))
     )
@@ -198,9 +203,12 @@ def test_assembly_does_not_change_provider_or_scope_semantics(tmp_path):
         tools.asset_for("shared.read", scope=scoped)
     admitted = DiscoveryScope(environment="host", permissions=frozenset({"read"}))
     assert tools.asset_for("shared.read", scope=admitted).asset_id == "shared.cli"
-    assert tools.select_asset(
-        "shared.read", target=TARGET, policy=POLICY, scope=admitted
-    ).asset_id == "shared.cli"
+    assert (
+        tools.select_asset(
+            "shared.read", target=TARGET, policy=POLICY, scope=admitted
+        ).asset_id
+        == "shared.cli"
+    )
 
 
 @pytest.mark.parametrize(
@@ -211,20 +219,39 @@ def test_assembly_does_not_change_provider_or_scope_semantics(tmp_path):
             {"schema_version": 2, "kind": "shared-asset-definitions", "assets": []},
             "invalid_definition",
         ),
-        ({"schema_version": 1, "kind": "other-kind", "assets": [asset()]}, "invalid_definition"),
-        ({"schema_version": 1, "kind": "shared-asset-definitions"}, "invalid_definition"),
         (
-            {"schema_version": True, "kind": "shared-asset-definitions", "assets": [asset()]},
+            {"schema_version": 1, "kind": "other-kind", "assets": [asset()]},
+            "invalid_definition",
+        ),
+        (
+            {"schema_version": 1, "kind": "shared-asset-definitions"},
+            "invalid_definition",
+        ),
+        (
+            {
+                "schema_version": True,
+                "kind": "shared-asset-definitions",
+                "assets": [asset()],
+            },
             "invalid_definition",
         ),
         ({"extra": 1, **document(asset())}, "invalid_definition"),
         (document({**asset(), "provenance": "publisher"}), "invalid_definition"),
         (document({**asset(), "tools": []}), "invalid_definition"),
-        (document({**asset(), "tools": ["shared.read", "shared.read"]}), "invalid_definition"),
+        (
+            document({**asset(), "tools": ["shared.read", "shared.read"]}),
+            "invalid_definition",
+        ),
         (document({**asset(), "tools": ["not-a-tool-id"]}), "invalid_definition"),
         (document({**asset(), "releases": []}), "invalid_definition"),
-        (document(asset(), asset(revision="other", releases=(release("9.0"),))), "conflicting_asset"),
-        (document({**asset(), "releases": [{**release(), "version": "latest"}]}), "mutable_version"),
+        (
+            document(asset(), asset(revision="other", releases=(release("9.0"),))),
+            "conflicting_asset",
+        ),
+        (
+            document({**asset(), "releases": [{**release(), "version": "latest"}]}),
+            "mutable_version",
+        ),
     ],
 )
 def test_unknown_or_invalid_documents_keep_explicit_reasons(tmp_path, value, reason):
@@ -246,7 +273,8 @@ def test_bounded_document_reading_rejects_duplicate_fields(tmp_path):
 
 def test_bundled_example_capabilities_are_examples_not_formal_capabilities():
     records = {
-        record.definition.asset_id: record for record in load_shared_definitions("examples.json")
+        record.definition.asset_id: record
+        for record in load_shared_definitions("examples.json")
     }
     assert set(records) == {"cli.ripgrep", "hyperfine"}
     # The bundled seed declares example capabilities only; assembly into a real

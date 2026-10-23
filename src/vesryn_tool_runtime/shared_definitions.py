@@ -54,7 +54,7 @@ def _record(entry):
         )
     except AssetError:
         raise
-    except (TypeError, KeyError, ValueError):
+    except TypeError, KeyError, ValueError:
         raise AssetError("invalid_definition") from None
 
 
@@ -90,7 +90,7 @@ def shared_definition_documents():
                 if item.name.endswith(".json") and item.is_file()
             )
         )
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return ()
 
 
@@ -111,9 +111,7 @@ def load_shared_definitions(source):
         try:
             raw = bundled.read_bytes()
         except OSError:
-            raise WorkflowError(
-                "Cannot read a supported workflow document"
-            ) from None
+            raise WorkflowError("Cannot read a supported workflow document") from None
         return _records(decode(raw))
     return _records(read(source))
 
