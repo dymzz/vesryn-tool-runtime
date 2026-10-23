@@ -22,8 +22,8 @@ and the per-group path ownership table are in
 
 ```python
 from vesryn_tool_runtime import (
-    SharedAssetDefinition,        # frozen record: definition + tools
-    load_shared_definitions,      # bundled name or filesystem path -> records
+    SharedAssetDefinition,  # frozen record: definition + tools
+    load_shared_definitions,  # bundled name or filesystem path -> records
     register_shared_definitions,  # records -> existing Catalog, via register_asset
     shared_definition_documents,  # bundled document names, sorted, nothing loaded
 )
@@ -69,8 +69,8 @@ Verified on 2026-10-24 with CPython 3.14.8 (this checkout's locked environment):
 | New common compatibility cases | 21 passed. |
 | Full existing suite | 152 passed, 1 skipped — no regression from the new exports/data. |
 | Lint | `ruff check src tests examples` clean. |
-| Candidate wheel | `vesryn_tool_runtime-0.2.0-py3-none-any.whl`, SHA-256 `4723b6ce575dfc21397a3e0c3a2f42a2ba5aac100006d89bdaefe45a97e8f5ab`; contains `shared_definitions.py` and `shared_assets/examples.json`. Candidate sdist SHA-256 `7e2430d9eed721e9148664a8d1a44e75e8ad62c1d8008b71ada0ab553d46b85f` also contains both and all test files (sdist `source-include` now takes `tests/**`, so group test files ship without further `pyproject` edits). |
-| Installed-artifact read (single) | Wheel extracted and imported from the extracted location only: `shared_definition_documents() == ("examples.json",)`, both seed records loaded, hyperfine 2.0.0 selected offline after explicit assembly. No installation matrix run. |
+| Candidate wheel | `vesryn_tool_runtime-0.2.0-py3-none-any.whl`, SHA-256 `c70c955a94ec3e5bdc83eaeb48f7527f54579078c20d3d241c95fe4ffb787860`; contains `shared_definitions.py` and `shared_assets/examples.json`. Candidate sdist SHA-256 `5173f9f49dee583502ab06b0550fed9ee70b6698745249a304a12e99a9372dae` also contains both and all test files (sdist `source-include` now takes `tests/**`, so group test files ship without further `pyproject` edits). Digests reflect the final formatted sources; earlier candidate `4723b6ce…` differed only by ruff formatting. |
+| Installed-artifact read (single) | Final candidate wheel extracted and imported from the extracted location only: `shared_definition_documents() == ("examples.json",)`, both seed records loaded, hyperfine 2.0.0 selected offline after explicit assembly. No installation matrix run. |
 
 The candidate wheel is stored under `.test-tools/issue-16/dist/`; it does not replace
 the released 0.2.0 artifact. Actual B/C/D/E definition content (Vulture, Pyright,

@@ -138,9 +138,10 @@ Run the offline sample with `python examples/shared_definitions.py` (installed
 candidate package, or this checkout's `src` on `PYTHONPATH`):
 
 ```python
-records = [r for name in shared_definition_documents()
-           for r in load_shared_definitions(name)]
-tools = Catalog()                       # a consumer's real capabilities first
+records = [
+    r for name in shared_definition_documents() for r in load_shared_definitions(name)
+]
+tools = Catalog()  # a consumer's real capabilities first
 tools.register(ToolSpec("example.benchmark", {}, {}, effect="check"), adapter)
 register_shared_definitions(tools, records)
 view = tools.asset_view("example.benchmark", target=target, policy=policy)
