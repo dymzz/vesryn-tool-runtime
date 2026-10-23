@@ -1,0 +1,82 @@
+# uv tool environments (TR-ASSET-01B)
+
+Public handoff for [issue #7](https://github.com/dymzz/vesryn-tool-runtime/issues/7),
+built on the [asset contracts](tool-assets.md) delivered by issue #6. These APIs are
+unreleased additions after source revision `f60eadd` (version `0.1.0`).
+
+`UvToolBackend` is a thin adapter. **uv** resolves, downloads, verifies hashes,
+caches and builds the environment. This package never walks or edits uv's cache, has
+no resolver and adds no service, database or scheduler.
+
+## Public signatures
+
+Exported from `vesryn_tool_runtime`:
+
+```python
+UvToolBackend(index: AssetIndex, *, uv="uv", find_links=(), index_url=None,
+              timeout=900, runner=subprocess.run)
+UvToolBackend.uv_version() -> str
+UvToolBackend.lock(selection, *, allow_network=False) -> UvLock
+UvToolBackend.prepare(selection, *, allow_network=False) -> dict   # AssetReceipt.document()
+UvToolBackend.installed(selection) -> dict
+UvToolBackend.command(catalog, selection, *, scope) -> tuple[str, ...]
+UvLock.document() -> dict
+```
+
+Only `python` / `uv` releases (`AssetRelease.distribution/backend`) are accepted.
+
+## Two different results
+
+| Call | What it does | Local state |
+| --- | --- | --- |
+| `prepare` | Builds a venv for **this host** and records an `AssetReceipt` in `AssetIndex`. | Creates `<root>/uv/artifact-<artifact_id>/` |
+| `lock` | Runs `uv pip compile --generate-hashes` for the selection's target and returns a `UvLock` for a container (for example Linux). | Only the lock inputs; no environment |
+
+A `UvLock` carries the full transitive requirements with hashes, the uv version, the
+`--python-platform`, and the frozen source SHA-256. uv's own reported wheel hash must
+equal the definition's `sha256`, otherwise `integrity_mismatch`. A container installs
+it with `uv pip install --require-hashes -r`; a Windows `.venv` is never copied.
+`tool==version` alone is not treated as locked.
+
+## Behaviour
+
+- **Own environment per artifact.** The directory is keyed by `artifact_id` (asset,
+  release, target). Two versions coexist; reuse by another consumer cannot replace
+  the environment another selection points at. Project dependencies and the project
+  `uv.lock` are never read or written, and the tool is not installed into a consumer
+  `.venv`.
+- **Acquisition vs execution.** `allow_network=False` (default) runs uv `--offline`.
+  It is the acquisition permission only. `command` additionally requires
+  `scope.admit(spec)` and an unchanged tool contract hash. Preparation never executes
+  the tool and installation grants no invocation right. `command` returns the
+  verified entry path of that environment; PATH and other installed tools are never
+  used, so a different version is never chosen silently. Execution stays in the
+  consumer's `ToolAdapter`.
+- **Receipt facts.** Success requires uv exit 0, the declared entry file hash, the
+  installed package/version equal to the selection, and an `environment_id` that
+  hashes the lock, interpreter and installed package set. Failures are recorded as
+  `failed`/`unavailable`/`interrupted` receipts and never as installation; the
+  receipt document keeps only status and exit code, never uv output.
+- **Unsupported hosts** (target OS/architecture differs from this host, or an
+  unknown uv platform, or no `target.python`) raise `AssetError("unsupported_target")`
+  before anything is touched.
+- **Later reality.** `installed` re-runs `uv pip check` offline and recomputes the
+  `environment_id`. A damaged environment is `invalid` and a removed one `missing`;
+  a cleared uv cache alone does not break a self-contained environment and is not
+  falsely reported either way. It never repairs or downloads.
+- Ordinary Catalog queries and `asset_view` still never prepare anything.
+
+## Evidence and limits
+
+[`examples/uv_tool_prepare.py`](../examples/uv_tool_prepare.py) prepares real
+vulture 2.16 and 2.14 wheels from PyPI and requests a Linux x86_64 lock. Recorded in
+[verification/tr-asset-01b.json](verification/tr-asset-01b.json). Tests in
+`tests/test_uv_assets.py` use the real uv executable with hand-built wheels.
+
+Not verified here: executing the lock inside Dagger/Linux, the ECI consumer, macOS,
+and Harness-Python compatibility. Semgrep stays OCI and is not handled by this
+backend. Offline preparation of a dependency set relies on uv's cache or
+`find_links`; a single `uvx` cache hit is not evidence of permanent offline
+availability.
+
+Up: [Documentation](README.md).

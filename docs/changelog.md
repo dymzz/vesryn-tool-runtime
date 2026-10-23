@@ -25,3 +25,6 @@
   built. The binding and admission compatibility conclusion, and the real `JsonlSink`
   regression behind it, are recorded in
   [TR-001](delivery/tr-001-binding-admission.md).
+
+- Add a thin uv adapter (UvToolBackend) that delegates resolution, download and environments to uv, with per-artifact environments, shared receipts and a hashed Linux lock description. Acquisition and execution stay separately permitted. See [uv tool environments](uv-tool-assets.md).
+
