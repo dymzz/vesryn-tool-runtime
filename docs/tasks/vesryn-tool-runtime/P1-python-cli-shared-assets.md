@@ -12,10 +12,8 @@ implementation.
 
 ## Handoff
 
-- Branch: `codex/issue-17-python-cli-shared-assets`, based on `3667238`.
-- Commit/PR identity: recorded once the commit is created; the checkout's `.git`
-  directory rejects writes from this session, so the branch/commit/PR step needs the
-  repository owner or a session with git write access.
+- Branch: `codex/issue-17-python-cli-shared-assets`, based on `3667238`; commit
+  `803fce3`, [PR #23](https://github.com/dymzz/vesryn-tool-runtime/pull/23).
 - Exclusive files added by this group:
   - `src/vesryn_tool_runtime/shared_assets/python.json` — the four definitions.
   - `tests/test_shared_assets_python.py` — offline group test.
@@ -84,5 +82,4 @@ implementation.
 
 Environment note: the Windows sandbox rejects the `0o700` temporary directories pytest
 creates, so the full suite was run in an unconfined process; no test, fixture or
-production file was changed for that. `.git` also rejects writes from this session, which
-is why the commit/PR step is pending.
+production file was changed for that.
