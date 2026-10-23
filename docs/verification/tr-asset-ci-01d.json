@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "kind": "tr-asset-ci-01d-verification",
+  "issue": "https://github.com/dymzz/vesryn-tool-runtime/issues/19",
+  "verified_on": "2026-10-24",
+  "source_baseline": "36672388624fd3008117d3b79c9819790d21a602",
+  "package_version": "0.2.0",
+  "artifacts": {
+    "semgrep": {
+      "asset_id": "semgrep",
+      "catalog_revision": "official-2026-10-24",
+      "version": "1.99.0",
+      "tool_id": "code.pattern-scan",
+      "distribution": "oci",
+      "backend": "oci",
+      "index_digest": "sha256:ae27024c16f7848cdbfd49c24ed0b78b13f13b85fcd7b87c679aaa8b0c0dce98",
+      "platforms": {
+        "linux/amd64": "sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d",
+        "linux/arm64": "sha256:08f1c44024049d1a104f57203dab60b3579f17a12fe87bac7bb60130bbc46bfc"
+      },
+      "entrypoint": "semgrep",
+      "dagger_native_execution": {
+        "status": "verified",
+        "container_ref": "docker.io/semgrep/semgrep@sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d",
+        "command": [
+          "semgrep",
+          "--version"
+        ],
+        "stdout": "1.99.0\n",
+        "exit_code": 0
+      }
+    },
+    "lychee": {
+      "asset_id": "lychee",
+      "catalog_revision": "official-2026-10-24",
+      "version": "0.18.0",
+      "tool_id": "docs.link-check",
+      "distribution": "oci",
+      "backend": "oci",
+      "upstream_repo": "docker.io/lycheeverse/lychee",
+      "upstream_tag": "sha-1780aa0",
+      "upstream_release_tag": "lychee-v0.18.0",
+      "upstream_commit": "1780aa0daa70462e296f9811e06178f13fd945db",
+      "index_digest": "sha256:83d7644b4b633943c94baa15ddd274637b9ec49f746ab2ce1c77c33be1e680a5",
+      "platforms": {
+        "linux/amd64": "sha256:606c60a7f61ab802297973d1bd9a429c88c4b99596a23bfe34e63a46b6d40fc8",
+        "linux/arm64": "sha256:b1be296f112676caac52748c7f692eacde9a26fa23f8715b5662af9ad7dd451c"
+      },
+      "entrypoint": "lychee",
+      "dagger_native_execution": {
+        "status": "unexecuted_declaration",
+        "reason": "Retained as unexecuted declaration with verified upstream provenance per acceptance criteria"
+      }
+    }
+  },
+  "directed_tests": {
+    "suite": "tests/test_shared_assets_oci.py",
+    "passed": 7,
+    "failed": 0
+  },
+  "full_test_suite": {
+    "passed": 159,
+    "skipped": 1,
+    "failed": 0
+  }
+}
