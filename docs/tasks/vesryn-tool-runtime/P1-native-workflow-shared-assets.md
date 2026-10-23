@@ -10,6 +10,10 @@ foundation (PR #21), which provides the public read/explicit-assembly interface
 and this group's exclusive paths. No release is performed; the package version
 stays 0.2.0.
 
+Handoff identity: [PR #22](https://github.com/dymzz/vesryn-tool-runtime/pull/22)
+(branch `codex/issue-18-native-workflow-shared-assets`, commit `2fecfc3` plus this
+record update), CI run 39994511975 green on the delivered head.
+
 ## Handoff
 
 - **Definitions** (`src/vesryn_tool_runtime/shared_assets/native.json`, this
