@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "kind": "shared-asset-definitions",
+  "assets": [
+    {
+      "asset_id": "osv-scanner",
+      "catalog_revision": "official-2026-10-23",
+      "tools": ["dependency.vulnerability-scan"],
+      "releases": [
+        {
+          "version": "2.6.0",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64",
+          "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108",
+          "entrypoint": "osv-scanner",
+          "os": "linux",
+          "arch": "x86_64",
+          "abi": null
+        }
+      ]
+    },
+    {
+      "asset_id": "actionlint",
+      "catalog_revision": "official-2026-10-24",
+      "tools": ["example.actionlint"],
+      "releases": [
+        {
+          "version": "1.7.12",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz",
+          "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
+          "entrypoint": "actionlint",
+          "os": "linux",
+          "arch": "x86_64",
+          "abi": null
+        }
+      ]
+    },
+    {
+      "asset_id": "shellcheck",
+      "catalog_revision": "official-2026-10-24",
+      "tools": ["example.shellcheck"],
+      "releases": [
+        {
+          "version": "0.11.0",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz",
+          "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198",
+          "entrypoint": "shellcheck",
+          "os": "linux",
+          "arch": "x86_64",
+          "abi": null
+        }
+      ]
+    },
+    {
+      "asset_id": "zizmor",
+      "catalog_revision": "official-2026-10-24",
+      "tools": ["example.zizmor"],
+      "releases": [
+        {
+          "version": "1.31.1",
+          "distribution": "native",
+          "backend": "aria2",
+          "source": "https://github.com/woodruffw/zizmor/releases/download/v1.31.1/zizmor-x86_64-unknown-linux-gnu.tar.gz",
+          "sha256": "d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99",
+          "entrypoint": "zizmor",
+          "os": "linux",
+          "arch": "x86_64",
+          "abi": "gnu"
+        }
+      ]
+    }
+  ]
+}
