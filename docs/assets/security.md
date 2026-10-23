@@ -2,8 +2,9 @@
 
 Delivery for [issue #20](https://github.com/dymzz/vesryn-tool-runtime/issues/20)
 (TR-ASSET-CI-01E / 12-E, child of [#12](https://github.com/dymzz/vesryn-tool-runtime/issues/12)),
-on top of the 12-A foundation (PR #21) with main at `193ca14` (which already
-carries D's #19 OCI declarations). This group exclusively owns
+on top of the merged 12-A foundation (PR #21), main `3667238`. D's #19 OCI
+declarations are an independent parallel delivery and not a prerequisite here.
+This group exclusively owns
 `src/vesryn_tool_runtime/shared_assets/security.json`,
 `tests/test_shared_assets_security.py` and this document.
 
