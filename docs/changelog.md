@@ -42,7 +42,7 @@
 
 - Add a thin uv adapter (UvToolBackend) that delegates resolution, download and environments to uv, with per-artifact environments, shared receipts and a hashed Linux lock description. Acquisition and execution stay separately permitted. See [uv tool environments](uv-tool-assets.md).
 
-## Unreleased
+## 0.3.0 — shared CI tool asset declarations
 
 - Add the shared asset definition foundation for TR-ASSET-CI-01A (issue #16): a strict
   shared-asset-definitions document format, a bundled per-group data directory and the
@@ -51,3 +51,20 @@
   semantics are unchanged; no second registry, installer or implicit loading is added.
   See [shared asset definitions](shared-definitions.md) and the
   [issue #16 delivery](tasks/vesryn-tool-runtime/P1-shared-asset-registration-foundation.md).
+
+- Bundle eleven CI program assets in four independently readable groups: Vulture,
+  Pyright, deptry, Pylint, OSV-Scanner, actionlint, ShellCheck, zizmor, Semgrep,
+  Lychee and Trivy. These are declarations, not automatic installation, executable
+  bindings or required CI gates. Gitleaks remains deferred. The documentation index
+  links each group's targets, provenance, preparation evidence and limitations.
+- Correct deptry's existing manylinux x86_64 wheel declaration to Linux x86_64.
+  Existing frozen selections remain readable; consumers regenerate the selection
+  and lock identity rather than rewriting historical records. The artifact bytes
+  and hashed requirement set are unchanged.
+- Keep the offline seed example usable when additional groups ship, enforce the
+  documented JSON object/list shapes, and correct OCI examples to the public
+  AssetPolicy/AssetTarget APIs and per-platform manifest sources.
+- Existing ToolSpec identities, Binding Schema 1, execution admission and uv/native
+  backends remain compatible. actionlint, ShellCheck, zizmor and Trivy retain
+  explicit example associations pending formal consumer check contracts. OCI
+  installation is delegated to Dagger; no Runtime OCI installer is added.

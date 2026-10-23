@@ -9,6 +9,7 @@
 - [CLI asset contracts](tool-assets.md): definitions, frozen version selections and local backend receipts/index.
 - [Native asset acquisition](native-assets.md): explicit aria2 preparation, repeated verification and File/Directory delivery.
 - [Shared asset definitions](shared-definitions.md): bundled shared-asset documents, identity mapping and B–E path ownership.
+- Shared CI assets: [Python CLI](assets/python-cli.md), [native/workflow](assets/native-workflow.md), [OCI](assets/oci.md), [security scanner](assets/security.md).
 - [TR-ASSET-01C delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md): issue #8 acceptance and evidence.
 - [uv tool environments](uv-tool-assets.md): issue #7 thin uv adapter, per-artifact environments and Linux lock description.
 - [0.2.0 / TR-ASSET-01 acceptance](tasks/vesryn-tool-runtime/P0-local-tool-assets.md): issue #5 joint verification and release criteria.
@@ -18,6 +19,6 @@
 - [Release readiness criteria](delivery/release-readiness.md): existing C1–C8 acceptance standard.
 - [0.1.0 extraction assessment](delivery/tool-runtime-0.1.0.md): actual evidence, statuses and publication boundary.
 - [TR-001 binding/admission compatibility](delivery/tr-001-binding-admission.md): public contract compatibility review for issue #2.
-- [Changelog](changelog.md): version 0.1.0 extraction.
+- [Changelog](changelog.md): versioned changes and compatibility notes.
 
 Up: [Repository](../README.md).

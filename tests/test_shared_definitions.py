@@ -238,6 +238,8 @@ def test_assembly_does_not_change_provider_or_scope_semantics(tmp_path):
         ({"extra": 1, **document(asset())}, "invalid_definition"),
         (document({**asset(), "provenance": "publisher"}), "invalid_definition"),
         (document({**asset(), "tools": []}), "invalid_definition"),
+        (document({**asset(), "tools": {"shared.read": True}}), "invalid_definition"),
+        (document(list(asset().items())), "invalid_definition"),
         (
             document({**asset(), "tools": ["shared.read", "shared.read"]}),
             "invalid_definition",
