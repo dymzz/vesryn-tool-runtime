@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "kind": "shared-asset-definitions",
+  "assets": [
+    {
+      "asset_id": "vulture",
+      "catalog_revision": "eci-tools-2026-10-23",
+      "tools": ["python.dead-code"],
+      "releases": [
+        {
+          "version": "2.16",
+          "distribution": "python",
+          "backend": "uv",
+          "source": "https://files.pythonhosted.org/packages/f5/be/f935130312330614811dae2ea9df3f395f6d63889eb6c2e68c14507152ee/vulture-2.16-py3-none-any.whl",
+          "sha256": "6e0f1c312cef1c87856957e5c2ca9608834a7c794c2180477f30bf0e4cc58eee",
+          "entrypoint": "vulture",
+          "os": "any",
+          "arch": "any",
+          "requires_python": ">=3.9",
+          "package": "vulture"
+        }
+      ]
+    },
+    {
+      "asset_id": "pyright",
+      "catalog_revision": "eci-tools-2026-10-23",
+      "tools": ["python.typecheck"],
+      "releases": [
+        {
+          "version": "1.1.414",
+          "distribution": "python",
+          "backend": "uv",
+          "source": "https://files.pythonhosted.org/packages/d7/ba/18b6e682ead424ad24bcc134339ae5d1b931cd9ae260540592a058a91279/pyright-1.1.414-py3-none-any.whl",
+          "sha256": "2a6b4b3298c9eec174c5ed83bd338de6eee82df2992f3e1930e6199d381be36f",
+          "entrypoint": "pyright",
+          "os": "any",
+          "arch": "any",
+          "requires_python": ">=3.7",
+          "package": "pyright"
+        }
+      ]
+    },
+    {
+      "asset_id": "deptry",
+      "catalog_revision": "eci-tools-2026-10-23",
+      "tools": ["python.dependency-hygiene"],
+      "releases": [
+        {
+          "version": "0.25.1",
+          "distribution": "python",
+          "backend": "uv",
+          "source": "https://files.pythonhosted.org/packages/72/9c/6f6f9125bac74b5d5d2af89536cbdb3fa159b6466aa097b74e7e85e8e030/deptry-0.25.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+          "sha256": "14bfcc28b4326ed8c6abb30691b19077d4ef8613cfba6c37ef5b1f471775bf6f",
+          "entrypoint": "deptry",
+          "os": "linux",
+          "arch": "x86_64",
+          "requires_python": ">=3.10",
+          "package": "deptry"
+        }
+      ]
+    },
+    {
+      "asset_id": "pylint",
+      "catalog_revision": "eci-tools-2026-10-23",
+      "tools": ["python.duplicate-code"],
+      "releases": [
+        {
+          "version": "4.1.3",
+          "distribution": "python",
+          "backend": "uv",
+          "source": "https://files.pythonhosted.org/packages/3f/ba/62b18e2e157d05f976bd490b349b55d8850c2a454a5c313c91af9d2e0baf/pylint-4.1.3-py3-none-any.whl",
+          "sha256": "a85357cae24f33ad8d86c8f3daaa92c600ae4012b54a57299cee76000e9364cf",
+          "entrypoint": "pylint",
+          "os": "any",
+          "arch": "any",
+          "requires_python": ">=3.10.0",
+          "package": "pylint"
+        }
+      ]
+    }
+  ]
+}
