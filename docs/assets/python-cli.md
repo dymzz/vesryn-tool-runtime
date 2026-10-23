@@ -71,7 +71,10 @@ No ECI checkout, adapter, installer or network is involved:
 
 ```python
 from vesryn_tool_runtime import (
-    AssetPolicy, AssetTarget, load_shared_definitions, register_shared_definitions,
+    AssetPolicy,
+    AssetTarget,
+    load_shared_definitions,
+    register_shared_definitions,
 )
 
 records = load_shared_definitions("python.json")  # bundled name, pure read
