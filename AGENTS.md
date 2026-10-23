@@ -1,5 +1,7 @@
 # Vesryn Tool Runtime — Agent Instructions
 
+所有访问其他目录的行为都需要手动批准
+
 Start at [docs/README.md](docs/README.md). Public technical documentation belongs
 under `docs/`. Keep version-specific evidence linked from the delivery assessment.
 
@@ -11,6 +13,7 @@ batches and original outcomes. Only explicit host scope admits execution.
 
 Use vesryn-log's public EventSink protocol, allowlist safe event fields, and report
 recording failures independently. Never log parameters or raw adapter diagnostics.
+
 
 ## Delivery
 
