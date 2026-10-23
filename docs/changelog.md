@@ -13,6 +13,12 @@
 
 ## Unreleased
 
+- Add explicit aria2 native-asset acquisition with pinned downloader provenance,
+  verified offline reuse, safe staged extraction and immutable version directories.
+  Reuse the common receipt/index and existing File/Directory transport; include
+  reviewed OSV/Hyperfine definitions. See [native assets](native-assets.md) and
+  [issue #8 delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md).
+
 - Add independent CLI asset definitions/target and version-policy resolution to the
   existing Catalog, plus frozen selection snapshots and a shared, integrity-checked
   local backend receipt/index boundary. Preserve tool/Binding hashes and admission;
