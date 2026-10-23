@@ -11,6 +11,9 @@ version 0.2.0. The package version stays 0.2.0; no release, tag or publication i
 performed by this task. Existing user changes to `AGENTS.md`, `.gitignore`, `.codex/`
 and `unregistered/` remain outside this implementation.
 
+Handoff identity for B/C/D/E: [PR #21](https://github.com/dymzz/vesryn-tool-runtime/pull/21)
+(branch `codex/issue-16-shared-asset-foundation`).
+
 ## Handoff
 
 Public signatures, the document format, identity mapping rules, the packaging rule
