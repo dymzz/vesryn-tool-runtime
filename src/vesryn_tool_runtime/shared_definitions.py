@@ -38,11 +38,15 @@ class SharedAssetDefinition:
 
 def _record(entry):
     try:
+        if not isinstance(entry, dict):
+            raise AssetError("invalid_definition")
         value = dict(entry)
         if set(value) != _ENTRY_FIELDS:
             raise AssetError("invalid_definition")
         releases = value["releases"]
         if not isinstance(releases, list) or not releases:
+            raise AssetError("invalid_definition")
+        if not isinstance(value["tools"], list):
             raise AssetError("invalid_definition")
         return SharedAssetDefinition(
             AssetDefinition(
@@ -120,9 +124,10 @@ def register_shared_definitions(catalog, definitions):
     """Explicitly associate shared definitions with existing catalog capabilities.
 
     Every association reuses Catalog.register_asset: each capability must
-    already be registered with its real ToolSpec and adapter, and conflicting
-    ownership keeps its existing AssetError. Records apply in order; the first
-    conflict raises while the associations already applied remain.
+    already be registered, and conflicting ownership keeps its existing
+    AssetError. Adapter readiness and execution admission remain separate.
+    Records apply in order; the first conflict raises while the associations
+    already applied remain.
     """
     if not isinstance(catalog, Catalog):
         raise WorkflowError("Definitions assemble into the existing Catalog contract")

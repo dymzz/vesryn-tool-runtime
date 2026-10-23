@@ -24,7 +24,10 @@ class ExampleAdapter:
 def example():
     names = shared_definition_documents()
     # Reading needs no Catalog, adapter, ECI checkout or consumer environment.
-    records = [record for name in names for record in load_shared_definitions(name)]
+    assert "examples.json" in names
+    # Other groups describe capabilities this example does not implement.
+    # Read and assemble only this example's document.
+    records = load_shared_definitions("examples.json")
     tools = Catalog()
     tools.provider_name = "example-cli-capabilities"
     # A real consumer registers its actual capabilities first. The bundled seed

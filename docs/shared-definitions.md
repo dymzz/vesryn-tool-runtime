@@ -2,10 +2,10 @@
 
 This is the public handoff for [issue #16](https://github.com/dymzz/vesryn-tool-runtime/issues/16),
 TR-ASSET-CI-01A / 12-A, child of [issue #12](https://github.com/dymzz/vesryn-tool-runtime/issues/12).
-Baseline: released 0.2.0, commit `306912152545e442a698b8b0c1f3188ce0fc09c1`. These APIs are
-working-tree additions after that baseline; they are not in the released 0.2.0 wheel.
-The referenced local task book was absent from this checkout; the delivery record was
-created from the fetched issue #16 body.
+Available in 0.3.0, after released 0.2.0 at
+`306912152545e442a698b8b0c1f3188ce0fc09c1`. These APIs and the grouped definitions
+are absent from the released 0.2.0 wheel. Group delivery records retain their
+original verification versions and commit identities.
 
 This task adds the minimal public read/explicit-assembly entry for shared asset
 definitions plus the identity mapping rules, so sub-tasks B/C/D/E [#17–#20] only add
@@ -104,10 +104,11 @@ exactly these top-level fields:
 - Reading shared definitions requires no ECI checkout, no Adapter, no consumer
   project environment and no Catalog. Ordinary reads perform no installation,
   network access, subprocess or write, and grant no execution permission.
-- Assembly reuses `Catalog.register_asset`: every associated capability must already
-  be registered with its real `ToolSpec` and adapter. An unimplemented capability
-  cannot be masqueraded by an empty Schema, an example ID or `Adapter=None`;
-  association with a missing capability is rejected as `unregistered_tool`.
+- Assembly reuses `Catalog.register_asset`: association with a missing capability
+  is rejected as `unregistered_tool`. Registration alone does not prove an
+  executable adapter, readiness, Binding or permission. Consumers supply their real
+  contracts and adapters; an example ID, empty Schema or `Adapter=None` is never
+  evidence that a production check is callable.
 - Records apply in order; the first conflict raises its existing `AssetError` while
   associations already applied remain. Pure capabilities without an asset keep the
   existing `unregistered_asset` answer from `asset_for`.
@@ -138,14 +139,21 @@ Run the offline sample with `python examples/shared_definitions.py` (installed
 candidate package, or this checkout's `src` on `PYTHONPATH`):
 
 ```python
-records = [
-    r for name in shared_definition_documents() for r in load_shared_definitions(name)
-]
+record = next(
+    r
+    for r in load_shared_definitions("examples.json")
+    if r.definition.asset_id == "hyperfine"
+)
 tools = Catalog()  # a consumer's real capabilities first
 tools.register(ToolSpec("example.benchmark", {}, {}, effect="check"), adapter)
-register_shared_definitions(tools, records)
+register_shared_definitions(tools, record)
 view = tools.asset_view("example.benchmark", target=target, policy=policy)
 ```
+
+The runnable sample assembles only its seed capabilities. To inspect other groups,
+read their documents independently; assemble only the records whose contracts the
+consumer actually implements. Reading every document does not require assembling
+every capability.
 
 ## Path ownership for B/C/D/E
 

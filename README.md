@@ -7,6 +7,8 @@ discovery, Selection Binding Schema 1, admission and batch invocation. Python 3.
 
 Start with [the documentation index](docs/README.md), including the runnable
 [quickstart](docs/quickstart.md), [public API](docs/python-api.md) and
+[shared asset definitions](docs/shared-definitions.md). Version 0.3.0 adds grouped
+CI tool declarations; see the [changelog](docs/changelog.md) and the historical
 [0.2.0 readiness and joint acceptance](docs/tasks/vesryn-tool-runtime/P0-local-tool-assets.md).
 
 The package owns tools, not workflows. Adapters keep their execution backends;
