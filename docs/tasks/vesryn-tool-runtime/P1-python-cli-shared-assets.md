@@ -45,7 +45,7 @@ implementation.
 | deptry platform correction and re-resolution verifiable; incompatible target not mis-selected; old selections stay readable | passed | deptry is `linux`/`x86_64`; Windows target raises `unsupported_target`; the #51 frozen selection loads unchanged by `AssetSelection.from_document`; the re-resolved Linux lock has the identical `requirements_sha256` `be985aac…7632`. |
 | Minimal verification of the affected selection/lock handoff; reuse #7 and #51 evidence instead of rerunning scans | passed with reuse | Locks for all four were re-resolved with uv 0.12.23 and compared field by field with #51; vulture/pyright/pylint artifact and requirement identities match. #7's prepared vulture 2.16 wheel is the same URL/SHA-256 and is cited, not rerun; no scan was executed. |
 | Verify affected items if artifacts, locks, interpreter or implementation change | passed | Wheel URLs/SHA-256 re-read from PyPI on 2026-10-24; uv version and target platform match the #51 locks. No change beyond the declared platform correction. |
-| Deliver commit/artifact, definition and derived-document identity, verification references, real prepared/verified state and uncovered targets | partial (commit/PR pending) | Data, test, document and checks are in the working tree; the wheel build contains `shared_assets/python.json`; installation/execution is explicitly `not_verified`. |
+| Deliver commit/artifact, definition and derived-document identity, verification references, real prepared/verified state and uncovered targets | passed | Commit `803fce3` on [PR #23](https://github.com/dymzz/vesryn-tool-runtime/pull/23); data, test, document and checks are delivered; the wheel build contains `shared_assets/python.json`; installation/execution stays `not_verified`. |
 
 ## Real prepared/verified state
 
@@ -77,6 +77,7 @@ implementation.
 - Wheel check: one local worktree build contains
   `vesryn_tool_runtime/shared_assets/python.json` (digest is recorded in the
   verification JSON with its concurrency caveat).
+- Required CI on PR #23: `package` passed and `python / checks` passed (format-check, lint, tests); `dependency-security` skipped.
 - Recorded details: [verification/tr-asset-ci-01b.json](../../verification/tr-asset-ci-01b.json),
   [group document](../../assets/python-cli.md).
 
