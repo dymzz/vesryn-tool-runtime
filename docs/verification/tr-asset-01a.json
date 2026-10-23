@@ -1,0 +1,40 @@
+{
+  "issue": 6,
+  "baseline_source_revision": "e016a50cbe242fac2148fb9ca974a7e3ea393006",
+  "scope": "local candidate, not a published release",
+  "python": "3.14.3",
+  "directed_tests": {
+    "new_asset_cases": 34,
+    "existing_affected_runtime_boundary_cases": 40,
+    "installed_candidate_total_passed": 74,
+    "concurrent_threads": 8,
+    "concurrent_processes": 6
+  },
+  "wheel": {
+    "filename": "vesryn_tool_runtime-0.1.0-py3-none-any.whl",
+    "sha256": "2d01aa4a9113937bea91c6865438db0070fcf28f5f9f6d9fff19051695b29a33",
+    "package_source_bytes_verified": true,
+    "excluded_private_work_directories": true,
+    "requirements": [
+      "filelock==3.20.3",
+      "jsonschema==4.26.0",
+      "packaging==26.3",
+      "vesryn-log>=0.1.0,<0.2.0"
+    ]
+  },
+  "public_signatures": {
+    "register_asset": "(self, definition, *, tools)",
+    "asset_for": "(self, tool_id, *, scope=None)",
+    "select_asset": "(self, tool_id, *, target, policy, version=None, specifier='', scope=None)",
+    "asset_view": "(self, tool_id, *, target, policy, selection=None, index=None, scope=None)"
+  },
+  "independent_sample": {
+    "cli.ripgrep": "15.2.0",
+    "cli.pytest": "9.0.3",
+    "installed": "not_configured",
+    "backend_invoked": false
+  },
+  "other_repositories_modified": false,
+  "downloads_or_installers_implemented": false,
+  "formal_release_created": false
+}

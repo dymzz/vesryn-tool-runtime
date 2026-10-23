@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "sources_verified_on": "2026-10-23",
+  "assets": [
+    {
+      "tool_id": "example.search",
+      "definition": {
+        "asset_id": "cli.ripgrep",
+        "catalog_revision": "ripgrep-15.2.0",
+        "releases": [
+          {
+            "version": "15.2.0",
+            "distribution": "native",
+            "backend": "aria2",
+            "source": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-pc-windows-msvc.zip",
+            "sha256": "e4abca10c3a64ebea742667dd7009449d49403db5460dd6873e389fa2945360f",
+            "entrypoint": "rg.exe",
+            "os": "windows",
+            "arch": "aarch64",
+            "abi": "msvc"
+          }
+        ]
+      },
+      "target": {"os": "windows", "arch": "aarch64", "abi": "msvc"},
+      "provenance": "https://github.com/BurntSushi/ripgrep/releases/tag/15.2.0"
+    },
+    {
+      "tool_id": "example.tests",
+      "definition": {
+        "asset_id": "cli.pytest",
+        "catalog_revision": "pytest-9.0.3",
+        "releases": [
+          {
+            "version": "9.0.3",
+            "distribution": "python",
+            "backend": "uv",
+            "source": "https://mirrors.aliyun.com/pypi/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl",
+            "sha256": "2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9",
+            "entrypoint": "pytest",
+            "package": "pytest",
+            "requires_python": ">=3.10",
+            "lock_ref": "pytest-9.0.3-py3-none-any.whl#sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9"
+          }
+        ]
+      },
+      "target": {"os": "linux", "arch": "x86_64", "python": "3.14.3"},
+      "provenance": "Repository uv.lock and installed pytest 9.0.3 METADATA (Requires-Python >=3.10)"
+    }
+  ]
+}

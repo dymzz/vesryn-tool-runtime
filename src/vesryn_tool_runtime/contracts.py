@@ -137,6 +137,8 @@ class Catalog:
     def __init__(self):
         self._tools = {}
         self._providers = {}
+        self._assets = {}
+        self._tool_assets = {}
 
     def register(self, spec: ToolSpec, adapter: ToolAdapter):
         spec = deepcopy(spec)
@@ -144,6 +146,66 @@ class Catalog:
         if spec.tool_id in self._tools:
             raise WorkflowError("Duplicate tool registration")
         self._tools[spec.tool_id] = (spec, adapter)
+
+    def register_asset(self, definition, *, tools):
+        """Associate one immutable CLI release definition with existing capabilities."""
+        from .assets import AssetDefinition, AssetError
+
+        tools = tuple(tools)
+        if not isinstance(definition, AssetDefinition) or not tools:
+            raise AssetError("invalid_definition")
+        if any(tool_id not in self._tools for tool_id in tools):
+            raise AssetError("unregistered_tool")
+        existing = self._assets.get(definition.asset_id)
+        if (existing is not None and existing != definition) or any(
+            tool_id in self._tool_assets
+            and self._tool_assets[tool_id] != definition.asset_id
+            for tool_id in tools
+        ):
+            raise AssetError("conflicting_asset")
+        self._assets[definition.asset_id] = definition
+        self._tool_assets.update({tool_id: definition.asset_id for tool_id in tools})
+
+    def asset_for(self, tool_id, *, scope=None):
+        """Read asset metadata; no local state, acquisition or admission is implied."""
+        from .assets import AssetError
+
+        if tool_id not in self._tools:
+            raise AssetError("unregistered_tool")
+        self.resolve(tool_id, scope=scope)
+        if tool_id not in self._tool_assets:
+            raise AssetError("unregistered_asset")
+        return self._assets[self._tool_assets[tool_id]]
+
+    def select_asset(
+        self, tool_id, *, target, policy, version=None, specifier="", scope=None
+    ):
+        from .assets import select_asset
+
+        return select_asset(
+            self,
+            tool_id,
+            target=target,
+            policy=policy,
+            version=version,
+            specifier=specifier,
+            scope=scope,
+        )
+
+    def asset_view(
+        self, tool_id, *, target, policy, selection=None, index=None, scope=None
+    ):
+        from .assets import asset_view
+
+        return asset_view(
+            self,
+            tool_id,
+            target=target,
+            policy=policy,
+            selection=selection,
+            index=index,
+            scope=scope,
+        )
 
     def provider_for(self, tool_id):
         """Host-declared provider identity, retained when explicit catalogs compose."""
@@ -170,8 +232,17 @@ class Catalog:
             spec.validate()
             staged[name] = (spec, adapter)
         identities = {name: provider.provider_for(name) for name in staged}
+        if any(
+            name in self._assets and self._assets[name] != definition
+            for name, definition in provider._assets.items()
+        ):
+            from .assets import AssetError
+
+            raise AssetError("conflicting_asset")
         self._tools.update(staged)
         self._providers.update(identities)
+        self._assets.update(provider._assets)
+        self._tool_assets.update(provider._tool_assets)
 
     def documents(self):
         return [

@@ -13,6 +13,12 @@
 
 ## Unreleased
 
+- Add independent CLI asset definitions/target and version-policy resolution to the
+  existing Catalog, plus frozen selection snapshots and a shared, integrity-checked
+  local backend receipt/index boundary. Preserve tool/Binding hashes and admission;
+  no downloader or installer is introduced. See [asset contracts](tool-assets.md)
+  and [issue #6 delivery](tasks/vesryn-tool-runtime/P0-tool-asset-resolution.md).
+
 - Widen the Log requirement to the compatible `>=0.1.0,<0.2.0` range while preserving the
   existing immutable development source and lock baseline. Tool contracts and Schema 1 are
   unchanged, and the delivered 0.1.0 wheel keeps its recorded SHA-256 until a new wheel is
