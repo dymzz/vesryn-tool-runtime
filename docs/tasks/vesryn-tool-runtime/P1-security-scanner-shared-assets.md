@@ -8,6 +8,10 @@ issue #20 body (same handling as the #6/#16/#18 records).
 Baseline: main `193ca14` — the merged 12-A foundation (PR #21) plus D's #19 OCI
 declarations. No release is performed; the package version stays 0.2.0.
 
+Handoff identity: [PR #25](https://github.com/dymzz/vesryn-tool-runtime/pull/25)
+(branch `codex/issue-20-security-scanner-shared-assets`, commit `cbe8510` plus
+this record update); submitted for review without merging.
+
 ## Handoff
 
 - **Trivy definition** (`src/vesryn_tool_runtime/shared_assets/security.json`,
