@@ -8,8 +8,9 @@ child of [Issue #12](https://github.com/dymzz/vesryn-tool-runtime/issues/12).
 
 - **Immutable Artifact Identity**: Declarations pin exact SHA-256 digests. Tags or unpinned image
   names are strictly prohibited as source digests.
-- **Index vs. Platform Manifest**: Asset releases distinguish multi-arch index digests
-  (declared in `source`) from platform-specific image manifests (declared in `sha256` per target).
+- **Index vs. Platform Manifest**: Each release pins the target platform manifest in both
+  `source` and `sha256`. Multi-arch index digests are provenance below; they are not
+  substituted for the platform manifest recorded in the release.
 - **No Local OCI Installer**: `vesryn-tool-runtime` does not implement an OCI puller, image unpacker,
   or container runtime. OCI image acquisition, layer caching, and isolation execution stay natively
   with Dagger (e.g., `dag.container().from_(image)`).
@@ -33,10 +34,10 @@ child of [Issue #12](https://github.com/dymzz/vesryn-tool-runtime/issues/12).
 - **Platform Releases**:
   - `linux/x86_64` (glibc):
     - Digest: `sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d`
-    - Source: `docker.io/semgrep/semgrep@sha256:ae27024c16f7848cdbfd49c24ed0b78b13f13b85fcd7b87c679aaa8b0c0dce98`
+    - Source: `docker.io/semgrep/semgrep@sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d`
   - `linux/aarch64` (glibc):
     - Digest: `sha256:08f1c44024049d1a104f57203dab60b3579f17a12fe87bac7bb60130bbc46bfc`
-    - Source: `docker.io/semgrep/semgrep@sha256:ae27024c16f7848cdbfd49c24ed0b78b13f13b85fcd7b87c679aaa8b0c0dce98`
+    - Source: `docker.io/semgrep/semgrep@sha256:08f1c44024049d1a104f57203dab60b3579f17a12fe87bac7bb60130bbc46bfc`
 - **engineering-ci Mapping**:
   - Module: `.dagger/src/engineering_ci/semgrep.py`
   - Consumer functions: `semgrep_scan`, `semgrep_report`, `semgrep_artifacts`
@@ -55,10 +56,10 @@ child of [Issue #12](https://github.com/dymzz/vesryn-tool-runtime/issues/12).
 - **Platform Releases**:
   - `linux/x86_64` (musl):
     - Digest: `sha256:606c60a7f61ab802297973d1bd9a429c88c4b99596a23bfe34e63a46b6d40fc8`
-    - Source: `docker.io/lycheeverse/lychee@sha256:83d7644b4b633943c94baa15ddd274637b9ec49f746ab2ce1c77c33be1e680a5`
+    - Source: `docker.io/lycheeverse/lychee@sha256:606c60a7f61ab802297973d1bd9a429c88c4b99596a23bfe34e63a46b6d40fc8`
   - `linux/aarch64` (musl):
     - Digest: `sha256:b1be296f112676caac52748c7f692eacde9a26fa23f8715b5662af9ad7dd451c`
-    - Source: `docker.io/lycheeverse/lychee@sha256:83d7644b4b633943c94baa15ddd274637b9ec49f746ab2ce1c77c33be1e680a5`
+    - Source: `docker.io/lycheeverse/lychee@sha256:b1be296f112676caac52748c7f692eacde9a26fa23f8715b5662af9ad7dd451c`
 - **engineering-ci Mapping**:
   - Module: `.dagger/src/engineering_ci/lychee.py`
   - Consumer functions: `lychee_check`, `lychee_report`, `lychee_artifacts`
@@ -71,8 +72,8 @@ To read and assemble these definitions in consumer projects:
 ```python
 from vesryn_tool_runtime import (
     Catalog,
-    ExecutionPolicy,
-    TargetPlatform,
+    AssetPolicy,
+    AssetTarget,
     ToolSpec,
     load_shared_definitions,
     register_shared_definitions,
@@ -90,12 +91,18 @@ catalog.register(ToolSpec("docs.link-check", {}, {}, effect="check"), lychee_ada
 register_shared_definitions(catalog, records)
 
 # 4. Target platform resolution
-linux_target = TargetPlatform(os="linux", arch="x86_64", abi="gnu")
+linux_target = AssetTarget(os="linux", arch="x86_64", abi="gnu")
+policy = AssetPolicy("consumer-approved-1")
 view = catalog.asset_view(
-    "code.pattern-scan", target=linux_target, policy=ExecutionPolicy()
+    "code.pattern-scan", target=linux_target, policy=policy
 )
-# view.selectable == True
-# view.release.sha256 == "374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d"
+assert view["selection_status"] == "selectable"
+selection = catalog.select_asset(
+    "code.pattern-scan", target=linux_target, policy=policy
+)
+assert selection.release.sha256 == (
+    "374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d"
+)
 ```
 
 ## Verification Status
@@ -104,4 +111,4 @@ view = catalog.asset_view(
   verifying `--version` output `1.99.0`.
 - **Lychee 0.18.0**: Upstream release metadata, Git tag, commit SHA, multi-arch index, and
   platform manifest digests verified against Docker Hub registry API. Execution status is retained
-  as unexecuted/ready declaration to reflect exact state per acceptance guidelines.
+  as an unexecuted declaration; neither local installation nor a successful check is claimed.
