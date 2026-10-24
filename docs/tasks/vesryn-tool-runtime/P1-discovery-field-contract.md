@@ -9,6 +9,10 @@ Baseline: v0.3.0 main `3902efcb2154c82caf95c8d7d449f7268d68f6d1` (issue #12
 completed and released). No release is performed here; the package version
 stays 0.3.0.
 
+Handoff identity: [PR #28](https://github.com/dymzz/vesryn-tool-runtime/pull/28)
+(branch `codex/issue-27-discovery-field-contract`, rebased onto main `098bf4d`;
+the PR is the stable identity); submitted for review without merging.
+
 ## Handoff
 
 The single field authority is `src/vesryn_tool_runtime/discovery_contracts.py`,
