@@ -13,7 +13,12 @@ with #14 later. Package version stays 0.3.0; no release is performed.
 ## Handoff
 
 - Branch: `dsh-35-progressive-group-discovery` (issue-id naming), stacked on
-  `dsh-34-tool-access-resolution`.
+  `dsh-34-tool-access-resolution`; commit `8292094`,
+  [PR #39](https://github.com/dymzz/vesryn-tool-runtime/pull/39) against the #34
+  branch. The repository's CI workflow only runs for pull requests whose base is
+  `main`, so this stacked PR reports no checks; the full suite and lint were run
+  locally on the recorded head. CI runs again when the parent branches merge and
+  GitHub retargets this PR to `main`.
 - Commit: `codex` author and committer (per the issue's Git identity rule).
 - Files:
   - `src/vesryn_tool_runtime/group_discovery.py` — `discover_groups`,
