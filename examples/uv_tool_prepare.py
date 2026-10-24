@@ -2,6 +2,8 @@
 
 Network use below is the explicit acquisition permission; running a tool needs the
 host's separate admitted scope. Run: ``uv run python examples/uv_tool_prepare.py``.
+Local Linux preparation uses the detected libc; an unknown libc is rejected.
+The separate Linux lock describes an explicitly selected glibc container target.
 """
 
 import json
@@ -12,6 +14,7 @@ import tempfile
 
 from vesryn_tool_runtime import (
     AssetDefinition,
+    AssetError,
     AssetIndex,
     AssetPolicy,
     AssetRelease,
@@ -71,13 +74,18 @@ def example():
     )
     policy = AssetPolicy("example-approval-1")
     python = f"{sys.version_info.major}.{sys.version_info.minor}"
+    abi = None
+    if OS == "linux":
+        abi = {"glibc": "gnu", "musl": "musl"}.get(platform.libc_ver()[0])
+        if abi is None:
+            raise AssetError("unsupported_target")
     scope = DiscoveryScope(permissions=frozenset({"check"}))
     with tempfile.TemporaryDirectory() as root:
         backend = UvToolBackend(AssetIndex(root))
         for version, _, _ in RELEASES:
             selection = tools.select_asset(
                 "dead.code",
-                target=AssetTarget(OS, ARCH, python=python),
+                target=AssetTarget(OS, ARCH, abi=abi, python=python),
                 policy=policy,
                 version=version,
             )
@@ -94,7 +102,7 @@ def example():
             }
         linux = tools.select_asset(
             "dead.code",
-            target=AssetTarget("linux", "x86_64", python="3.14"),
+            target=AssetTarget("linux", "x86_64", abi="gnu", python="3.14"),
             policy=policy,
             version="2.16",
         )

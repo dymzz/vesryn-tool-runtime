@@ -81,7 +81,8 @@ worktree or replace its lock files.
 
 ## Reading and assembling
 
-No ECI checkout, adapter, installer or network is involved:
+No ECI checkout, adapter, installer or network is involved.
+The example selects a Linux x86_64 target already known to use glibc:
 
 ```python
 from vesryn_tool_runtime import (
@@ -95,10 +96,14 @@ records = load_shared_definitions("python.json")  # bundled name, pure read
 register_shared_definitions(tools, records)  # capabilities must exist already
 selection = tools.select_asset(
     "python.dependency-hygiene",
-    target=AssetTarget("linux", "x86_64", python="3.14"),
+    target=AssetTarget("linux", "x86_64", abi="gnu", python="3.14"),
     policy=AssetPolicy("eci-tools-2026-10-23"),
 )
 ```
+
+The [0.3.1 release evidence](https://github.com/dymzz/vesryn-tool-runtime/releases/tag/v0.3.1)
+retains the failing and corrected consumer runs. The local uv preparation example
+detects its host libc; its GNU-container lock is a separate explicit target.
 
 The bundled document is returned by `shared_definition_documents()` and ships inside
 the wheel with no manifest or `pyproject` change. Association still requires each
