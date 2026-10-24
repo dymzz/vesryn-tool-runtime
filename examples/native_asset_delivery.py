@@ -7,41 +7,36 @@ from pathlib import Path
 from vesryn_tool_runtime import (
     Aria2NativeBackend,
     Aria2Source,
-    AssetDefinition,
     AssetIndex,
     AssetPolicy,
-    AssetRelease,
     AssetTarget,
     Catalog,
     ToolSpec,
-    load_shared_definitions,
+    legacy_preparation_definitions,
 )
 
 
 def example_catalog():
-    definitions = json.loads(
+    """Register the manifest tools from the live record declaration.
+
+    OLD PREPARATION CALLER (temporary, #33 removes it): definitions come from
+    the read-only legacy view over the bundled live records — the retired
+    shared_assets JSON documents are no longer a source. The .example ToolSpec
+    stays only as the selection carrier the current backends require.
+    """
+    manifest = json.loads(
         Path(__file__).with_name("native-assets.json").read_text(encoding="utf-8")
     )
+    live = {
+        definition.asset_id: definition
+        for definition in legacy_preparation_definitions()
+    }
     catalog = Catalog()
     catalog.provider_name = "native-delivery-example"
-    for value in definitions["definitions"]:
+    for value in manifest["definitions"]:
         tool_id = value["asset_id"] + ".example"
-        # Consumers supply the actual execution Adapter and capability contract.
         catalog.register(ToolSpec(tool_id, {}, {}), None)
-        if "shared_document" in value:
-            # Release authority lives in the bundled shared definition document.
-            definition = next(
-                record.definition
-                for record in load_shared_definitions(value["shared_document"])
-                if record.definition.asset_id == value["asset_id"]
-            )
-        else:
-            definition = AssetDefinition(
-                value["asset_id"],
-                value["catalog_revision"],
-                tuple(AssetRelease(**release) for release in value["releases"]),
-            )
-        catalog.register_asset(definition, tools=(tool_id,))
+        catalog.register_asset(live[value["asset_id"]], tools=(tool_id,))
     return catalog
 
 
@@ -90,7 +85,7 @@ def main():
         selection,
         policy=policy,
         allow_network=args.allow_network,
-        source_artifact=args.source_artifact,
+        source_artifact=args.source_art,
     )
     value = {"receipt": receipt.document(), "reason": receipt.outcome.reason}
     if receipt.outcome.status == "passed":

@@ -40,6 +40,42 @@ def _translate(error, duplicate_code):
     raise error
 
 
+def insert_asset(db, asset):
+    """Insert one asset and its releases on the caller's transaction."""
+    db.execute(
+        "INSERT INTO tool_asset"
+        " (tool_id, name, provider, package, entrypoint)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (
+            asset.tool_id,
+            asset.name,
+            asset.provider,
+            asset.package,
+            asset.entrypoint,
+        ),
+    )
+    db.executemany(
+        "INSERT INTO tool_release"
+        " (tool_id, version, platform_os, platform_arch,"
+        " platform_abi, platform_python, source, digest_type,"
+        " digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (
+                asset.tool_id,
+                item.version,
+                item.platform.os if item.platform else None,
+                item.platform.arch if item.platform else None,
+                item.platform.abi if item.platform else None,
+                item.python,
+                item.source,
+                item.digest_type,
+                item.digest,
+            )
+            for item in asset.versions
+        ],
+    )
+
+
 class AssetTable:
     """Writes and reads ToolAsset rows and their release sub-rows."""
 
@@ -51,40 +87,18 @@ class AssetTable:
             raise RecordError("invalid_record")
         try:
             with self._db:
-                self._db.execute(
-                    "INSERT INTO tool_asset"
-                    " (tool_id, name, provider, package, entrypoint)"
-                    " VALUES (?, ?, ?, ?, ?)",
-                    (
-                        asset.tool_id,
-                        asset.name,
-                        asset.provider,
-                        asset.package,
-                        asset.entrypoint,
-                    ),
-                )
-                self._db.executemany(
-                    "INSERT INTO tool_release"
-                    " (tool_id, version, platform_os, platform_arch,"
-                    " platform_abi, platform_python, source, digest_type,"
-                    " digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    [
-                        (
-                            asset.tool_id,
-                            item.version,
-                            item.platform.os if item.platform else None,
-                            item.platform.arch if item.platform else None,
-                            item.platform.abi if item.platform else None,
-                            item.python,
-                            item.source,
-                            item.digest_type,
-                            item.digest,
-                        )
-                        for item in asset.versions
-                    ],
-                )
+                insert_asset(self._db, asset)
         except sqlite3.IntegrityError as error:
             _translate(error, "duplicate_tool_id")
+
+    def all(self):
+        """Every asset, ordered by tool primary key (base traversal)."""
+        return tuple(
+            self.get(tool_id)
+            for (tool_id,) in self._db.execute(
+                "SELECT tool_id FROM tool_asset ORDER BY tool_id"
+            )
+        )
 
     def get(self, tool_id):
         _name(tool_id, "unknown_tool", 256)
@@ -116,6 +130,27 @@ class AssetTable:
         return ToolAsset(row[0], row[1], row[2], versions, row[4], package=row[3])
 
 
+def insert_group(db, group):
+    """Insert one group, its members and their aliases."""
+    db.execute(
+        "INSERT INTO tool_group (group_id, summary) VALUES (?, ?)",
+        (group.group_id, group.summary),
+    )
+    db.executemany(
+        "INSERT INTO tool_group_member (group_id, tool_id, summary) VALUES (?, ?, ?)",
+        [(group.group_id, member.tool_id, member.summary) for member in group.members],
+    )
+    db.executemany(
+        "INSERT INTO tool_group_member_alias"
+        " (group_id, tool_id, alias) VALUES (?, ?, ?)",
+        [
+            (group.group_id, member.tool_id, alias)
+            for member in group.members
+            for alias in member.aliases
+        ],
+    )
+
+
 class GroupTable:
     """Writes and reads ToolGroup rows, member rows and member aliases."""
 
@@ -127,29 +162,18 @@ class GroupTable:
             raise RecordError("invalid_record")
         try:
             with self._db:
-                self._db.execute(
-                    "INSERT INTO tool_group (group_id, summary) VALUES (?, ?)",
-                    (group.group_id, group.summary),
-                )
-                self._db.executemany(
-                    "INSERT INTO tool_group_member"
-                    " (group_id, tool_id, summary) VALUES (?, ?, ?)",
-                    [
-                        (group.group_id, member.tool_id, member.summary)
-                        for member in group.members
-                    ],
-                )
-                self._db.executemany(
-                    "INSERT INTO tool_group_member_alias"
-                    " (group_id, tool_id, alias) VALUES (?, ?, ?)",
-                    [
-                        (group.group_id, member.tool_id, alias)
-                        for member in group.members
-                        for alias in member.aliases
-                    ],
-                )
+                insert_group(self._db, group)
         except sqlite3.IntegrityError as error:
             _translate(error, "duplicate_group_id")
+
+    def all(self):
+        """Every group, ordered by group primary key (base traversal)."""
+        return tuple(
+            self.get(group_id)
+            for (group_id,) in self._db.execute(
+                "SELECT group_id FROM tool_group ORDER BY group_id"
+            )
+        )
 
     def get(self, group_id):
         _name(group_id, "unknown_group", 256)
@@ -181,6 +205,23 @@ class GroupTable:
         return ToolGroup(row[0], row[1], members)
 
 
+def insert_access(db, access):
+    """Insert one access row."""
+    db.execute(
+        "INSERT INTO tool_access"
+        " (access_id, tool_id, method, target, contract, summary)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            access.access_id,
+            access.tool_id,
+            access.method,
+            access.target,
+            canonical(dict(access.contract)).decode(),
+            access.summary,
+        ),
+    )
+
+
 class AccessTable:
     """Writes and reads ToolAccess rows, by entry key or by tool."""
 
@@ -192,21 +233,18 @@ class AccessTable:
             raise RecordError("invalid_record")
         try:
             with self._db:
-                self._db.execute(
-                    "INSERT INTO tool_access"
-                    " (access_id, tool_id, method, target, contract, summary)"
-                    " VALUES (?, ?, ?, ?, ?, ?)",
-                    (
-                        access.access_id,
-                        access.tool_id,
-                        access.method,
-                        access.target,
-                        canonical(dict(access.contract)).decode(),
-                        access.summary,
-                    ),
-                )
+                insert_access(self._db, access)
         except sqlite3.IntegrityError as error:
             _translate(error, "duplicate_access_id")
+
+    def all(self):
+        """Every entry, ordered by access primary key (base traversal)."""
+        return tuple(
+            self.get(access_id)
+            for (access_id,) in self._db.execute(
+                "SELECT access_id FROM tool_access ORDER BY access_id"
+            )
+        )
 
     def get(self, access_id):
         _name(access_id, "unknown_access", 256)
@@ -222,6 +260,12 @@ class AccessTable:
     def for_tool(self, tool_id):
         """Every entry of one tool; a tool may expose several."""
         _name(tool_id, "unknown_tool", 256)
+        tool_exists = self._db.execute(
+            "SELECT 1 FROM tool_asset WHERE tool_id = ?",
+            (tool_id,),
+        ).fetchone()
+        if tool_exists is None:
+            raise RecordError("unknown_tool")
         return tuple(
             ToolAccess(row[0], row[1], row[2], row[3], json.loads(row[4]), row[5])
             for row in self._db.execute(
@@ -240,6 +284,77 @@ class RecordStore:
         self.assets = AssetTable(db)
         self.groups = GroupTable(db)
         self.accesses = AccessTable(db)
+
+    def put_records(self, records):
+        """Register a batch atomically: assets, then groups, then accesses.
+
+        In-batch references resolve in that order. A record identical to the
+        stored one is skipped (idempotent re-registration); the same primary
+        key with different content is an explicit conflict and the whole
+        batch rolls back — a failed batch never leaves a partial catalog.
+        """
+        records = tuple(records)
+        staged = {"asset": [], "group": [], "access": []}
+        for record in records:
+            if isinstance(record, ToolAsset):
+                staged["asset"].append(record)
+            elif isinstance(record, ToolGroup):
+                staged["group"].append(record)
+            elif isinstance(record, ToolAccess):
+                staged["access"].append(record)
+            else:
+                raise RecordError("invalid_record")
+        for kind, key_of in (
+            ("asset", lambda record: record.tool_id),
+            ("group", lambda record: record.group_id),
+            ("access", lambda record: record.access_id),
+        ):
+            keys = [key_of(record) for record in staged[kind]]
+            if len(set(keys)) != len(keys):
+                raise RecordError(f"duplicate_{kind}")
+        try:
+            with self._db:
+                for record in staged["asset"]:
+                    self._put_one(
+                        record,
+                        insert_asset,
+                        self.assets.get,
+                        record.tool_id,
+                        "duplicate_tool_id",
+                    )
+                for record in staged["group"]:
+                    self._put_one(
+                        record,
+                        insert_group,
+                        self.groups.get,
+                        record.group_id,
+                        "duplicate_group_id",
+                    )
+                for record in staged["access"]:
+                    self._put_one(
+                        record,
+                        insert_access,
+                        self.accesses.get,
+                        record.access_id,
+                        "duplicate_access_id",
+                    )
+        except sqlite3.IntegrityError as error:
+            _translate(error, "invalid_record")
+
+    def _put_one(self, record, insert, read, key, duplicate_code):
+        try:
+            insert(self._db, record)
+        except sqlite3.IntegrityError as error:
+            message = str(error).casefold()
+            if "unique" not in message and "primary key" not in message:
+                _translate(error, duplicate_code)
+            try:
+                existing = read(key)
+            except RecordError:
+                _translate(error, duplicate_code)
+            if existing != record:
+                raise RecordError(duplicate_code) from None
+            # Identical re-registration: idempotent, no duplicate entry.
 
     def close(self):
         self._db.close()

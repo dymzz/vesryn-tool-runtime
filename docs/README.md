@@ -8,7 +8,7 @@
 - [Dagger package delivery](dagger.md): fixed-revision wheel delivery for executors.
 - [CLI asset contracts](tool-assets.md): definitions, frozen version selections and local backend receipts/index.
 - [Native asset acquisition](native-assets.md): explicit aria2 preparation, repeated verification and File/Directory delivery.
-- [Shared asset definitions](shared-definitions.md): bundled shared-asset documents, identity mapping and B–E path ownership.
+- [Shared asset definitions](shared-definitions.md): retired; the live record declaration and its public loading chain (#32).
 - Shared CI assets: [Python CLI](assets/python-cli.md), [native/workflow](assets/native-workflow.md), [OCI](assets/oci.md), [security scanner](assets/security.md).
 - [Discovery field contracts](discovery-contracts.md): the ToolAsset/ToolGroup/ToolAccess field dictionary over the six-table SQLite layout (#27).
 - [TR-ASSET-01C delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md): issue #8 acceptance and evidence.

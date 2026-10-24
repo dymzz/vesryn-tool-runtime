@@ -64,59 +64,61 @@ jobs:
           store.close()
           assert SCHEMA_VERSION == 2
           PY
-      - name: Verify combined shared definitions offline
+      - name: Verify the live record declaration offline
         run: |
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/shared_definitions.py
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I - <<'PY'
+          # The bundled live declaration loads from package resources and
+          # the public registration/composition chain works from the
+          # installed wheel alone -- no placeholder capabilities, no
+          # source checkout.
           import json
           import os
           from importlib.metadata import version
           from pathlib import Path
 
           from vesryn_tool_runtime import (
-              Catalog, ToolSpec, load_shared_definitions,
-              register_shared_definitions, shared_definition_documents,
+              RecordError, ToolAsset, bundled_records, compose_catalog,
+              legacy_preparation_definitions, open_record_store,
           )
-
-          class NoExecution:
-              def invoke(self, calls, context):
-                  raise AssertionError("Offline assembly must not execute a tool")
 
           assert version("vesryn-tool-runtime") == "0.3.1"
-          names = shared_definition_documents()
-          records = tuple(r for name in names for r in load_shared_definitions(name))
+          records = bundled_records()
+          assets = [r for r in records if isinstance(r, ToolAsset)]
+          identities = [r.tool_id for r in assets]
+          assert len(identities) == len(set(identities))
           required = {
-              "vulture", "pyright", "deptry", "pylint", "osv-scanner",
-              "actionlint", "shellcheck", "zizmor", "semgrep", "lychee", "trivy",
+              "trivy", "vulture", "hyperfine", "ripgrep", "osv-scanner",
+              "actionlint", "shellcheck", "zizmor", "semgrep", "lychee",
+              "pyright", "deptry", "pylint", "import-linter", "hypothesis",
+              "mutmut", "schemathesis",
           }
-          identities = [r.definition.asset_id for r in records]
           assert required <= set(identities)
-          assert len(identities) == len(set(identities)), "Duplicate shared asset identity"
-          catalog = Catalog()
-          contracts = {}
-          # Test-only contracts prove association, never production callability.
-          for record in records:
-              for tool_id in record.tools:
-                  spec = ToolSpec(tool_id, {}, {}, effect="check")
-                  catalog.register(spec, NoExecution())
-                  contracts[tool_id] = spec.sha256
-          register_shared_definitions(catalog, records)
-          for record in records:
-              for tool_id in record.tools:
-                  assert catalog.asset_for(tool_id) == record.definition
-                  assert catalog.resolve(tool_id)[0].sha256 == contracts[tool_id]
+          catalog = compose_catalog(records)
+          assert len(catalog.accesses_for("trivy")) == 3
+          assert catalog.accesses_for("deptry") == ()
+          try:
+              catalog.accesses_for("absent")
+              raise SystemExit("missing tool must not resolve")
+          except RecordError as error:
+              assert error.code == "unknown_tool"
+          store = open_record_store(":memory:")
+          store.put_records(records)
+          assert store.assets.get("vulture").versions[1].python == ">=3.8"
+          store.close()
+          assert len(legacy_preparation_definitions()) == len(assets)
           evidence = {
               "version": version("vesryn-tool-runtime"),
-              "documents": names,
-              "definitions": {r.definition.asset_id: r.definition.sha256 for r in records},
-              "required_assets": sorted(required),
-              "offline_assembly": "passed",
+              "tools": sorted(identities),
+              "groups": sorted(g.group_id for g in catalog.groups()),
+              "accesses": sorted(a.access_id for a in catalog.accesses()),
+              "placeholders": "none",
               "execution": "not_performed",
           }
-          Path(os.environ["RUNNER_TEMP"], "shared-asset-acceptance.json").write_text(
+          Path(os.environ["RUNNER_TEMP"], "live-declaration.json").write_text(
               json.dumps(evidence, indent=2) + "\n", encoding="utf-8"
           )
-          print(f"Offline installed-wheel assembly passed: {len(records)} assets")
+          print(f"Live declaration verified offline: {len(identities)} tools")
           PY
       - name: Prepare independent acceptance toolchain
         run: |
