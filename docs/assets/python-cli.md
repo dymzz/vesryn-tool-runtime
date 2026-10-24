@@ -21,26 +21,40 @@ declares one real publisher wheel per program:
 | `deptry` | `python.dependency-hygiene` | 0.25.1 | `deptry-0.25.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl` | linux/x86_64 | `>=3.10` | `deptry` |
 | `pylint` | `python.duplicate-code` | 4.1.3 | `pylint-4.1.3-py3-none-any.whl` | any/any | `>=3.10.0` | `pylint` |
 
-Every release is `distribution: python` / `backend: uv`, carries the publisher URL and
-full lowercase SHA-256, and has `abi: null`. Sources and hashes were re-read from PyPI
-for these versions on 2026-10-24 and match the engineering-ci #51 frozen selections;
-the definition digests of vulture, pyright and pylint reproduce that record
+Every release is `distribution: python` / `backend: uv` and carries the publisher
+URL and full lowercase SHA-256. Sources and hashes were re-read from PyPI for these
+versions on 2026-10-24 and match the engineering-ci #51 frozen selections; the
+definition digests of vulture, pyright and pylint reproduce that record
 byte-for-byte. Asset IDs stay the canonical lowercase program names; the capability
 IDs and their ToolSpec contracts are unchanged.
 
-`abi: null` is deliberate. The three universal wheels are genuinely
-platform-independent, and deptry's target constraint is expressed only as
-linux/x86_64, matching the existing `linux`/`x86_64`/`abi: null` engineering-ci target.
-deptry's wheel is manylinux_2_17 x86_64 (glibc); musl is not served. The uv
-backend's supported platforms are the explicit `x86_64-unknown-linux-gnu` family, so
-no unsupported libc is selected implicitly.
+## Platform and ABI semantics (issue #29)
+
+`abi` states the artifact's real C-library constraint, not a documentation note. The
+three universal wheels are genuinely platform-independent and keep `abi: null`; deptry
+declares `abi: gnu` because its wheel is `manylinux_2_17_x86_64` (glibc). Per the
+[PyPA platform tag specification](https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/)
+manylinux means glibc and musllinux means musl, and `linux`/`x86_64` alone does not
+equate the two. Consequences, enforced by selection **and** by uv admission:
+
+- An explicit `AssetTarget("linux", "x86_64", abi="musl")` can no longer select the
+  deptry wheel (`unsupported_target`), and the uv backend resolves it with the
+  `x86_64-unknown-linux-musl` triple — never a silent GNU one.
+- A Linux target with no ABI states an unknown C library. It is explicitly rejected
+  (`unsupported_target`) rather than treated as unconstrained: a glibc-constrained
+  artifact is not reported usable where compatibility cannot be proven. Consumers
+  whose real environment is glibc (the ECI Dagger containers) state `abi: "gnu"`.
+- The uv backend reads the wheel's own filename (`manylinux…`/`musllinux…`) and
+  admits only a matching Linux/libc target, so an old mislabeled selection cannot
+  pass execution admission on the wrong libc even though the frozen file itself
+  stays readable as history.
 
 ## The deptry platform correction
 
 The #51 record declared the manylinux x86_64 wheel with `os: any` and `arch: any`,
-which let a Windows or macOS target select a wheel it cannot install. The source
-definition now states `os: linux`, `arch: x86_64`; the artifact URL and SHA-256 are
-unchanged.
+which let a Windows or macOS target select a wheel it cannot install. Correction
+came in two steps: #17 stated `os: linux`, `arch: x86_64`; #29 added
+`abi: gnu`. The artifact URL and SHA-256 are unchanged.
 
 The correction changes only declaration identity:
 

@@ -27,7 +27,7 @@ project dependencies, managed by the project's own pyproject/uv.lock.
 | `source` | HTTPS/file artifact URL without embedded credentials, query or fragment; OCI source must end in its exact `@sha256:…` digest. A definition does not establish backend support or readiness. |
 | `sha256` | Full lowercase SHA-256 of the distribution artifact. For OCI, its pinned digest. This is distinct from hashes of extracted entry files. |
 | `entrypoint` | CLI entry name, without arguments or path traversal. |
-| `os`, `arch`, `abi` | Declared target constraints. Native/OCI require explicit OS and architecture; Python universal artifacts may use `any`. An ABI constraint requires an exact target match. |
+| `os`, `arch`, `abi` | Declared target constraints. Native/OCI require explicit OS and architecture; Python universal artifacts may use `any`. An ABI constraint requires an exact target match. For Linux, `abi` carries the C library: `gnu` (glibc) or `musl`; a `manylinux` wheel declares `gnu`, a `musllinux` wheel `musl`, and an absent ABI means the artifact is genuinely unconstrained — not that any libc matches. |
 | `package`, `requires_python` | Required for Python distributions: package name and PEP 440 interpreter constraint. Target interpreter version must be supplied explicitly. |
 | `lock_ref` | Optional publisher-owned immutable lock reference. Not copied uv metadata or a takeover of the consumer's project lock. |
 

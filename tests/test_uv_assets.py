@@ -36,7 +36,7 @@ ARCH = {
     "aarch64": "aarch64",
 }[platform.machine().lower()]
 PYTHON = f"{sys.version_info.major}.{sys.version_info.minor}"
-TARGET = AssetTarget(OS, ARCH, python=PYTHON)
+TARGET = AssetTarget(OS, ARCH, python=PYTHON, abi="gnu" if OS == "linux" else None)
 POLICY = AssetPolicy("approved-1")
 
 
@@ -265,7 +265,7 @@ def test_discovery_does_not_prepare_and_execution_needs_its_own_admission(
 def test_lock_describes_target_linux_for_containers(tmp_path, backend):
     path, sha = wheel(tmp_path / "wheels", "vtr_cli", "1.0", script="vtr-cli")
     tools = catalog(release(path, sha, "1.0"))
-    linux = AssetTarget("linux", "x86_64", python=PYTHON)
+    linux = AssetTarget("linux", "x86_64", abi="gnu", python=PYTHON)
     selection = tools.select_asset("vtr.check", target=linux, policy=POLICY)
     lock = backend.lock(selection, policy=POLICY)
     document = lock.document()
@@ -329,3 +329,70 @@ def test_current_disable_and_version_policy_apply_to_old_uv_snapshots(
                 policy=policy,
             )
     assert not backend.root.exists()
+
+
+def test_linux_triples_follow_the_targets_real_libc(tmp_path, backend):
+    path, sha = wheel(tmp_path / "wheels", "vtr_cli", "1.0", script="vtr-cli")
+    tools = catalog(release(path, sha, "1.0"))
+    # A musl request resolves with the musl triple, never a silent GNU one.
+    musl = AssetTarget("linux", "x86_64", abi="musl", python=PYTHON)
+    selection = tools.select_asset("vtr.check", target=musl, policy=POLICY)
+    document = backend.lock(selection, policy=POLICY).document()
+    assert document["python_platform"] == "x86_64-unknown-linux-musl"
+    # A Linux target whose C library is unknown cannot get a truthful triple;
+    # it is explicitly rejected instead of resolved as GNU.
+    unknown = replace(selection, target=AssetTarget("linux", "x86_64", python=PYTHON))
+    with pytest.raises(AssetError) as error:
+        backend.installed(unknown, policy=POLICY)
+    assert error.value.code == "unsupported_target"
+
+
+def test_platform_wheel_libc_is_read_from_the_artifact_name(tmp_path, backend):
+    path, _ = wheel(tmp_path / "wheels", "vtr_cli", "1.0", script="vtr-cli")
+    glibc = path.with_name("vtr_cli-1.0-cp314-abi3-manylinux_2_17_x86_64.whl")
+    musl_wheel = path.with_name("vtr_cli-1.0-cp314-abi3-musllinux_1_2_x86_64.whl")
+    shutil.copyfile(path, glibc)
+    shutil.copyfile(path, musl_wheel)
+    glibc_sha = hashlib.sha256(glibc.read_bytes()).hexdigest()
+    musl_sha = hashlib.sha256(musl_wheel.read_bytes()).hexdigest()
+
+    # Old-style mislabel: the release declares no ABI, but the manylinux name
+    # is the authoritative artifact fact; admission follows it, not the label.
+    mislabeled = catalog(release(glibc, glibc_sha, "1.0"))
+    selection = mislabeled.select_asset("vtr.check", target=TARGET, policy=POLICY)
+    for target in (
+        AssetTarget("linux", "x86_64", abi="musl", python=PYTHON),
+        AssetTarget("linux", "x86_64", python=PYTHON),
+        AssetTarget("windows", "x86_64", abi="msvc", python=PYTHON),
+    ):
+        with pytest.raises(AssetError) as error:
+            backend.installed(replace(selection, target=target), policy=POLICY)
+        assert error.value.code == "unsupported_target"
+    # A genuinely glibc target passes admission; the miss is an index fact.
+    assert (
+        backend.installed(
+            replace(
+                selection,
+                target=AssetTarget("linux", "x86_64", abi="gnu", python=PYTHON),
+            ),
+            policy=POLICY,
+        )["status"]
+        == "missing"
+    )
+
+    # A musllinux wheel never reaches a glibc target, labeled or not.
+    musl_tools = catalog(release(musl_wheel, musl_sha, "1.0"))
+    musl_selection = musl_tools.select_asset(
+        "vtr.check",
+        target=AssetTarget("linux", "x86_64", abi="musl", python=PYTHON),
+        policy=POLICY,
+    )
+    with pytest.raises(AssetError) as error:
+        backend.installed(
+            replace(
+                musl_selection,
+                target=AssetTarget("linux", "x86_64", abi="gnu", python=PYTHON),
+            ),
+            policy=POLICY,
+        )
+    assert error.value.code == "unsupported_target"
