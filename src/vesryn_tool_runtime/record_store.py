@@ -237,16 +237,33 @@ class RecordStore:
         self._db.close()
 
 
-def open_record_store(path):
-    """Open (creating if needed) a store whose tables match the field tables."""
-    if isinstance(path, (str, Path)) and str(path) == ":memory:":
+RECORDS_DATABASE = "records.sqlite3"
+
+
+def default_database():
+    """Databases live in data/: the default is the committed library there."""
+    return Path(__file__).resolve().parents[2] / "data" / RECORDS_DATABASE
+
+
+def open_record_store(path=None):
+    """Open a store whose tables match the field tables.
+
+    Without a path this opens ``data/records.sqlite3`` — databases are stored
+    under ``data/``; temporary scratch work belongs in temp directories, not
+    the database home.
+    """
+    if path is None:
+        target = default_database()
+    elif isinstance(path, (str, Path)) and str(path) == ":memory:":
+        target = None
         location = ":memory:"
     elif isinstance(path, (str, Path)):
         target = Path(path)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        location = str(target)
     else:
         raise RecordError("invalid_store")
+    if target is not None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        location = str(target)
     db = sqlite3.connect(location)
     try:
         db.execute("PRAGMA foreign_keys = ON")

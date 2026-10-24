@@ -4,9 +4,8 @@ The DDL lives in ``data/record_schema.sql`` — that committed file alone is
 the frozen authority for the storage layout (issue #27, reopened;
 owner-directed structure). This module pins its version and column lists and
 loads the SQL verbatim; the parity check in record_store then refuses any
-database whose tables drift from it. ``data/`` holds committed artifacts
-only — the frozen schema, the seed data and the built SQLite library;
-runtime databases go to temp locations, never into ``data/``.
+database whose tables drift from it. ``data/`` is the database home:
+the frozen schema, the seed data and the SQLite libraries live there.
 """
 
 from pathlib import Path

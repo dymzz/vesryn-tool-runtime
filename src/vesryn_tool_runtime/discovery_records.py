@@ -168,3 +168,191 @@ class ToolAccess:
             raise RecordError("invalid_record")
         canonical(dict(self.contract))
         _name(self.summary, "invalid_record", 2048)
+
+
+# -- serialization ------------------------------------------------------------
+#
+# The records serialize themselves; the query layer carries these documents
+# without inventing parallel summary types (single field source).
+
+
+def _require(condition):
+    if not condition:
+        raise RecordError("invalid_record")
+
+
+def _document_mapping(value):
+    if not isinstance(value, Mapping):
+        raise RecordError("invalid_record")
+    return dict(value)
+
+
+def _document_platform(value):
+    if value is None:
+        return None
+    value = _document_mapping(value)
+    _require(set(value) == {"os", "arch"})
+    return Platform(value["os"], value["arch"])
+
+
+def platform_document(platform):
+    return None if platform is None else {"os": platform.os, "arch": platform.arch}
+
+
+class _RecordDocument:
+    """Shared document()/from_document plumbing for the three records."""
+
+    def document(self):
+        raise NotImplementedError
+
+    @classmethod
+    def from_document(cls, document):
+        raise NotImplementedError
+
+
+def _asset_version_document(item):
+    return {
+        "version": item.version,
+        "platform": platform_document(item.platform),
+        "source": item.source,
+        "digest_type": item.digest_type,
+        "digest": item.digest,
+    }
+
+
+def _asset_version_from_document(value):
+    value = _document_mapping(value)
+    _require(set(value) == {"version", "platform", "source", "digest_type", "digest"})
+    return ToolAssetVersion(
+        value["version"],
+        value["source"],
+        value["digest_type"],
+        value["digest"],
+        _document_platform(value["platform"]),
+    )
+
+
+def _tool_asset_document(asset):
+    value = {
+        "tool_id": asset.tool_id,
+        "name": asset.name,
+        "provider": asset.provider,
+        "versions": [_asset_version_document(item) for item in asset.versions],
+        "entrypoint": asset.entrypoint,
+    }
+    if asset.package is not None:
+        value["package"] = asset.package
+    return value
+
+
+def _tool_asset_from_document(value):
+    value = _document_mapping(value)
+    fields = {"tool_id", "name", "provider", "versions", "entrypoint", "package"}
+    _require(
+        set(value) <= fields
+        and {"tool_id", "name", "provider", "versions", "entrypoint"} <= set(value)
+    )
+    versions = value["versions"]
+    _require(isinstance(versions, list) and versions)
+    return ToolAsset(
+        value["tool_id"],
+        value["name"],
+        value["provider"],
+        tuple(_asset_version_from_document(item) for item in versions),
+        value["entrypoint"],
+        package=value.get("package"),
+    )
+
+
+def _group_member_document(member):
+    return {
+        "tool_id": member.tool_id,
+        "summary": member.summary,
+        "aliases": list(member.aliases),
+    }
+
+
+def _group_member_from_document(value):
+    value = _document_mapping(value)
+    _require(set(value) == {"tool_id", "summary", "aliases"})
+    aliases = value["aliases"]
+    _require(isinstance(aliases, list))
+    return GroupMember(value["tool_id"], value["summary"], tuple(aliases))
+
+
+def _tool_group_document(group):
+    return {
+        "group_id": group.group_id,
+        "summary": group.summary,
+        "members": [_group_member_document(item) for item in group.members],
+    }
+
+
+def _tool_group_from_document(value):
+    value = _document_mapping(value)
+    _require(set(value) == {"group_id", "summary", "members"})
+    members = value["members"]
+    _require(isinstance(members, list) and members)
+    return ToolGroup(
+        value["group_id"],
+        value["summary"],
+        tuple(_group_member_from_document(item) for item in members),
+    )
+
+
+def _tool_access_document(access):
+    return {
+        "access_id": access.access_id,
+        "tool_id": access.tool_id,
+        "method": access.method,
+        "target": access.target,
+        "contract": dict(access.contract),
+        "summary": access.summary,
+    }
+
+
+def _tool_access_from_document(value):
+    value = _document_mapping(value)
+    _require(
+        set(value)
+        == {"access_id", "tool_id", "method", "target", "contract", "summary"}
+    )
+    return ToolAccess(
+        value["access_id"],
+        value["tool_id"],
+        value["method"],
+        value["target"],
+        _document_mapping(value["contract"]),
+        value["summary"],
+    )
+
+
+def record_document(record):
+    """Serialize one of the three records to its bounded JSON object."""
+    if isinstance(record, ToolAsset):
+        return _tool_asset_document(record)
+    if isinstance(record, ToolGroup):
+        return _tool_group_document(record)
+    if isinstance(record, ToolAccess):
+        return _tool_access_document(record)
+    raise RecordError("invalid_record")
+
+
+def record_from_document(document):
+    """Parse one record document back into its record (strict round trip)."""
+    value = _document_mapping(document)
+    kinds = (
+        (
+            _tool_asset_from_document,
+            {"tool_id", "name", "provider", "versions", "entrypoint"},
+        ),
+        (_tool_group_from_document, {"group_id", "summary", "members"}),
+        (
+            _tool_access_from_document,
+            {"access_id", "tool_id", "method", "target", "contract", "summary"},
+        ),
+    )
+    for parser, required in kinds:
+        if required <= set(value):
+            return parser(value)
+    raise RecordError("invalid_record")

@@ -31,21 +31,27 @@ from .contracts import (
     ToolSpec,
 )
 from .discovery_contracts import (
-    AccessEntrySummary,
-    CandidateSummary,
-    ContractDetail,
     DiscoveryContractError,
     DiscoveryDiagnostic,
     DiscoveryErrorDocument,
     DiscoveryPage,
     DiscoveryQuery,
+)
+from .discovery_records import (
     GroupMember,
-    GroupSummary,
-    compose_access_id,
+    Platform,
+    RecordError,
+    ToolAccess,
+    ToolAsset,
+    ToolAssetVersion,
+    ToolGroup,
+    record_document,
+    record_from_document,
 )
 from .documents import ToolRuntimeError
 from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_tool
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
+from .record_store import open_record_store
 from .registry import compose, provider
 from .scope import DiscoveryScope
 from .shared_definitions import (
@@ -58,7 +64,6 @@ from .uv_assets import UvLock, UvToolBackend
 
 __all__ = [
     "SELECTION_BINDING",
-    "AccessEntrySummary",
     "Aria2NativeBackend",
     "Aria2Source",
     "AssetDefinition",
@@ -70,9 +75,7 @@ __all__ = [
     "AssetRelease",
     "AssetSelection",
     "AssetTarget",
-    "CandidateSummary",
     "Catalog",
-    "ContractDetail",
     "DiscoveryContractError",
     "DiscoveryDiagnostic",
     "DiscoveryErrorDocument",
@@ -82,11 +85,16 @@ __all__ = [
     "DispatchReceipt",
     "ExecutionContext",
     "GroupMember",
-    "GroupSummary",
     "Invocation",
     "NativeAssetDelivery",
+    "Platform",
+    "RecordError",
     "SharedAssetDefinition",
+    "ToolAccess",
     "ToolAdapter",
+    "ToolAsset",
+    "ToolAssetVersion",
+    "ToolGroup",
     "ToolResult",
     "ToolRuntime",
     "ToolRuntimeError",
@@ -97,12 +105,14 @@ __all__ = [
     "canonical_binding",
     "checked_result",
     "compose",
-    "compose_access_id",
     "create_binding",
     "invoke_tool",
     "load_shared_definitions",
     "native_asset_directory",
+    "open_record_store",
     "provider",
+    "record_document",
+    "record_from_document",
     "register_shared_definitions",
     "shared_definition_documents",
     "verify_binding",
