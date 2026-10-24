@@ -10,7 +10,9 @@ This branch is independent of the still-open PR #31 (#29); where they touch the 
 files (`shared_assets/python.json`, `tests/test_shared_assets_python.py`,
 `docs/verification/tr-asset-ci-01b.json`, `docs/tool-assets.md`) they must merge
 serially per the issue's rule — merge #31 first and rebase this branch, or resolve at
-merge. Git identity: `zcode <zcode@local>`.
+merge. Git identity: `zcode <zcode@local>`. Handoff identity: [PR #36](https://github.com/dymzz/vesryn-tool-runtime/pull/36) (branch
+`codex/issue-32-unified-tool-registration`); submitted for review without
+merging.
 
 ## Unified registration (the public model)
 
