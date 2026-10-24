@@ -17,6 +17,7 @@
 - [TR-ASSET-01A delivery](tasks/vesryn-tool-runtime/P0-tool-asset-resolution.md): issue #6 scope, public handoff and directed acceptance.
 - [TR-ASSET-CI-01A delivery](tasks/vesryn-tool-runtime/P1-shared-asset-registration-foundation.md): issue #16 shared identity and explicit assembly foundation.
 - [TR-DISC-01A delivery](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md): issue #27 discovery field contract foundation.
+- [TR-DISC-01B delivery](tasks/vesryn-tool-runtime/P1-unified-tool-registration.md): issue #32 unified tool registration and live definition migration.
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): existing C1–C8 acceptance standard.
 - [0.1.0 extraction assessment](delivery/tool-runtime-0.1.0.md): actual evidence, statuses and publication boundary.

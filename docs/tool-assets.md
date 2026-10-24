@@ -68,10 +68,17 @@ AssetIndex.record(receipt: AssetReceipt) -> dict
 AssetIndex.installed(selection: AssetSelection) -> dict
 ```
 
-Register the ToolSpec/adapter first. `register_asset` requires at least one existing
-tool ID, supports one definition associated with many tools, and rejects conflicting
-asset ownership atomically. Composition and scoped catalogs preserve associations
-and original Provider identities; they do not build a second Registry.
+Since #32, tools register **directly by primary key**: `register_asset` no longer
+requires a pre-registered capability, and no empty ToolSpec or placeholder
+capability is needed. It supports one definition associated with many tool keys
+and rejects conflicting asset ownership atomically. Composition and scoped
+catalogs preserve associations and original Provider identities; they do not
+build a second Registry. `Catalog.register_tool(ToolAsset(...))` registers a
+single tool record, `register_group`/`group_for` and
+`register_access`/`access_for` register and read groups (members reference
+tool keys, unknown references rejected) and access entries (the #27
+`AccessEntrySummary`). Registration is not installation, binding or execution,
+and a frozen selection still requires a registered capability contract.
 
 The selection contains tool ID/Provider/contract hash, asset ID, publication revision
 and definition hash, exact release, complete target, policy snapshot/revision and

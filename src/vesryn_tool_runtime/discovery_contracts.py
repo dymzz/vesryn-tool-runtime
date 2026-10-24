@@ -67,6 +67,7 @@ MIN_LIMIT = 1
 MAX_LIMIT = 50
 
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}")
+_TOOL_PK = _TOKEN  # Tool primary keys accept bare names since #32.
 _NAME = re.compile(NAME["pattern"])
 _TOOL = re.compile(TOOL["pattern"])
 _HASH = re.compile(r"[0-9a-f]{64}")
@@ -143,7 +144,7 @@ def compose_access_id(catalog_ref, tool_id, entry_key):
     and version/contract-digest changes never enter it.
     """
     _matches(catalog_ref, _NAME, "invalid_query")
-    _matches(tool_id, _TOOL, "invalid_query")
+    _matches(tool_id, _TOOL_PK, "invalid_query")
     _matches(entry_key, _NAME, "invalid_query")
     return f"{catalog_ref}:{tool_id}@{entry_key}"
 
@@ -151,7 +152,7 @@ def compose_access_id(catalog_ref, tool_id, entry_key):
 def _entry_identity(entry, code):
     """Validate the entry's naming parts and its composed access identity."""
     _matches(entry.catalog_ref, _NAME, code)
-    _matches(entry.tool_id, _TOOL, code)
+    _matches(entry.tool_id, _TOOL_PK, code)
     _matches(entry.entry_key, _NAME, code)
     if entry.access_id is None:
         object.__setattr__(
@@ -263,7 +264,10 @@ GROUP_SCHEMA = {
                 "minItems": 1,
                 "items": object_schema(
                     {
-                        "tool_id": {"type": "string", "pattern": TOOL["pattern"]},
+                        "tool_id": {
+                            "type": "string",
+                            "pattern": _TOOL_PK.pattern,
+                        },
                         "catalog_ref": {
                             "type": "string",
                             "pattern": NAME["pattern"],
@@ -290,7 +294,7 @@ CANDIDATE_SCHEMA = {
         {
             "schema_version": {"const": SCHEMA_VERSION, "type": "integer"},
             "kind": {"const": CANDIDATE_KIND},
-            "tool_id": {"type": "string", "pattern": TOOL["pattern"]},
+            "tool_id": {"type": "string", "pattern": _TOOL_PK.pattern},
             "display_name": _string_schema(120),
             "description": _string_schema(240),
             "domain": {"type": "string", "pattern": NAME["pattern"]},
@@ -339,7 +343,7 @@ ACCESS_SCHEMA = {
             "kind": {"const": ACCESS_KIND},
             "access_id": _string_schema(256, minimum=1),
             "catalog_ref": {"type": "string", "pattern": NAME["pattern"]},
-            "tool_id": {"type": "string", "pattern": TOOL["pattern"]},
+            "tool_id": {"type": "string", "pattern": _TOOL_PK.pattern},
             "entry_key": {"type": "string", "pattern": NAME["pattern"]},
             "provider": {"type": "string", "pattern": NAME["pattern"]},
             "environment": {"type": "string", "pattern": NAME["pattern"]},
@@ -537,7 +541,7 @@ class GroupMember:
     catalog_ref: str
 
     def __post_init__(self):
-        _matches(self.tool_id, _TOOL, "invalid_document")
+        _matches(self.tool_id, _TOOL_PK, "invalid_document")
         _matches(self.catalog_ref, _NAME, "invalid_document")
 
     def document(self):
@@ -636,7 +640,7 @@ class CandidateSummary:
 
     def __post_init__(self):
         code = "invalid_document"
-        _matches(self.tool_id, _TOOL, code)
+        _matches(self.tool_id, _TOOL_PK, code)
         _bounded(self.description, code, maximum=240, allow_empty=True)
         _matches(self.domain, _NAME, code)
         _enum(self.effect, EFFECTS, code)

@@ -32,9 +32,20 @@
    "os": "any",
    "arch": "any",
    "abi": null,
-   "definition_sha256": "f1a35415e6df3ddc9e351435c0cc827189f32531c1a449c13e62f20461c531ef",
+   "definition_sha256": "6dbabb57bf200df6885d7a11780ccef1ba6d236467e95dceab865ebf69c97eac",
    "engineering_ci_definition_sha256": "f1a35415e6df3ddc9e351435c0cc827189f32531c1a449c13e62f20461c531ef",
-   "identity_preserved": true
+   "identity_preserved": false,
+   "versions": [
+    {
+     "version": "2.16",
+     "requires_python": ">=3.9"
+    },
+    {
+     "version": "2.14",
+     "requires_python": ">=3.8"
+    }
+   ],
+   "correction": "#32 migrated the still-used 2.14 release from the old uv_tool_prepare path into this single source, with PyPI-verified per-release Requires-Python (2.16 >=3.9, 2.14 >=3.8; the old path flattened both to >=3.8); the 2.16 artifact URL and SHA-256 are unchanged"
   },
   {
    "asset_id": "pyright",
@@ -209,6 +220,12 @@
    "checked": "2026-10-24",
    "change": "deptry release abi null -> gnu; definition digest regenerated through load_shared_definitions; uv admission now follows the target's real libc",
    "previous_definition_sha256": "94f8982819a48c8f3069a6bf3068deb4a71944301336ccb92ab7f16159f4cc97"
+  },
+  {
+   "issue": 32,
+   "checked": "2026-10-24",
+   "change": "vulture definition extended with release 2.14 and regenerated through load_shared_definitions under unified tool registration",
+   "previous_definition_sha256": "f1a35415e6df3ddc9e351435c0cc827189f32531c1a449c13e62f20461c531ef"
   }
  ]
 }

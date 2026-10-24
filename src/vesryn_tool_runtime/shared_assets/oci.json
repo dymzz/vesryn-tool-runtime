@@ -5,7 +5,9 @@
     {
       "asset_id": "semgrep",
       "catalog_revision": "official-2026-10-24",
-      "tools": ["code.pattern-scan"],
+      "tools": [
+        "semgrep"
+      ],
       "releases": [
         {
           "version": "1.99.0",
@@ -32,7 +34,9 @@
     {
       "asset_id": "lychee",
       "catalog_revision": "official-2026-10-24",
-      "tools": ["docs.link-check"],
+      "tools": [
+        "lychee"
+      ],
       "releases": [
         {
           "version": "0.18.0",

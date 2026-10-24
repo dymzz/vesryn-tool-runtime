@@ -79,6 +79,15 @@ Consumers in engineering-ci (#52/#53) must regenerate `deptry.selection.json` an
 lock from the corrected definition. This repository does not edit the consumer
 worktree or replace its lock files.
 
+## Unified registration and the 2.14 migration (issue #32)
+
+The four tools register directly under their real, source-backed ECI
+capability IDs — no capability prerequisite and no placeholder (#32). Vulture's
+definition now carries both still-used releases: 2.16 (the unresolved default,
+Requires-Python `>=3.9`) and 2.14 (migrated from the retiring
+`examples/uv_tool_prepare.py` path with PyPI-verified Requires-Python
+`>=3.8`); the 2.16 artifact is unchanged.
+
 ## Reading and assembling
 
 No ECI checkout, adapter, installer or network is involved:
@@ -92,7 +101,7 @@ from vesryn_tool_runtime import (
 )
 
 records = load_shared_definitions("python.json")  # bundled name, pure read
-register_shared_definitions(tools, records)  # capabilities must exist already
+register_shared_definitions(tools, records)  # direct tool-key registration
 selection = tools.select_asset(
     "python.dependency-hygiene",
     target=AssetTarget("linux", "x86_64", python="3.14"),
@@ -101,9 +110,10 @@ selection = tools.select_asset(
 ```
 
 The bundled document is returned by `shared_definition_documents()` and ships inside
-the wheel with no manifest or `pyproject` change. Association still requires each
-capability to be registered with its real ToolSpec and adapter; the definition never
-creates a capability and grants no install or execution right.
+the wheel with no manifest or `pyproject` change. Registration works with or
+without capability contracts; a frozen selection additionally requires the
+capability's real ToolSpec and adapter, and the definition never creates a
+capability or grants an install/execution right.
 
 ## What is not delivered
 

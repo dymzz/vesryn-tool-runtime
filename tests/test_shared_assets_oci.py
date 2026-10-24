@@ -26,7 +26,7 @@ VERIFIED = {
         "version": "1.99.0",
         "index_digest": "ae27024c16f7848cdbfd49c24ed0b78b13f13b85fcd7b87c679aaa8b0c0dce98",
         "entrypoint": "semgrep",
-        "tools": ("code.pattern-scan",),
+        "tools": ("semgrep",),
         "revision": "official-2026-10-24",
         "platforms": {
             ("linux", "x86_64"): {
@@ -43,7 +43,7 @@ VERIFIED = {
         "version": "0.18.0",
         "index_digest": "83d7644b4b633943c94baa15ddd274637b9ec49f746ab2ce1c77c33be1e680a5",
         "entrypoint": "lychee",
-        "tools": ("docs.link-check",),
+        "tools": ("lychee",),
         "revision": "official-2026-10-24",
         "platforms": {
             ("linux", "x86_64"): {
@@ -91,53 +91,51 @@ def test_oci_tools_target_linux_and_reject_windows(asset_id):
     records = {r.definition.asset_id: r for r in load_shared_definitions("oci.json")}
     definition = records[asset_id].definition
     tool_id = records[asset_id].tools[0]
+    assert tool_id == asset_id  # bare program primary key since #32
 
+    # Bare keys register directly with no capability; platform resolution is
+    # read from the available releases, and selecting stays an explicit
+    # refusal until a real entry contract exists.
     catalog = Catalog()
-    catalog.register(ToolSpec(tool_id, {}, {}, effect="check"), None)
     catalog.register_asset(definition, tools=(tool_id,))
+    assert catalog.asset_for(tool_id) is definition
 
-    # Linux x86_64 resolves to amd64 manifest
-    sel_amd64 = catalog.select_asset(tool_id, target=LINUX_AMD64, policy=POLICY)
-    assert sel_amd64.release.arch == "x86_64"
+    amd64 = catalog.asset_view(tool_id, target=LINUX_AMD64, policy=POLICY)
+    assert [r["arch"] for r in amd64["available"]] == ["x86_64"]
     assert (
-        sel_amd64.release.sha256
-        == VERIFIED[asset_id]["platforms"][("linux", "x86_64")]["digest"]
+        amd64["available"][0]["sha256"]
+        == (VERIFIED[asset_id]["platforms"][("linux", "x86_64")]["digest"])
     )
 
-    # Linux aarch64 resolves to arm64 manifest
-    sel_arm64 = catalog.select_asset(tool_id, target=LINUX_ARM64, policy=POLICY)
-    assert sel_arm64.release.arch == "aarch64"
+    arm64 = catalog.asset_view(tool_id, target=LINUX_ARM64, policy=POLICY)
+    assert [r["arch"] for r in arm64["available"]] == ["aarch64"]
     assert (
-        sel_arm64.release.sha256
-        == VERIFIED[asset_id]["platforms"][("linux", "aarch64")]["digest"]
+        arm64["available"][0]["sha256"]
+        == (VERIFIED[asset_id]["platforms"][("linux", "aarch64")]["digest"])
     )
 
-    # Windows target is rejected with unsupported_target
+    windows = catalog.asset_view(tool_id, target=WINDOWS_X86, policy=POLICY)
+    assert windows["available"] == []
     with pytest.raises(AssetError) as exc_info:
-        catalog.select_asset(tool_id, target=WINDOWS_X86, policy=POLICY)
-    assert exc_info.value.code == "unsupported_target"
+        catalog.select_asset(tool_id, target=LINUX_AMD64, policy=POLICY)
+    assert exc_info.value.code == "unregistered_tool"
 
 
 def test_assembly_and_views_through_public_catalog():
     records = load_shared_definitions("oci.json")
+    # The whole document loads with no ToolSpec at all (#32): declarations
+    # are available, and the missing entry contract is stated, not faked.
     catalog = Catalog()
-    for record in records:
-        for tool_id in record.tools:
-            catalog.register(ToolSpec(tool_id, {}, {}, effect="check"), None)
     register_shared_definitions(catalog, records)
 
-    view_semgrep = catalog.asset_view(
-        "code.pattern-scan", target=LINUX_AMD64, policy=POLICY
-    )
-    assert view_semgrep["selection_status"] == "selectable"
+    view_semgrep = catalog.asset_view("semgrep", target=LINUX_AMD64, policy=POLICY)
+    assert view_semgrep["selection_status"] == "unregistered_tool"
     assert len(view_semgrep["available"]) == 1
     assert view_semgrep["available"][0]["entrypoint"] == "semgrep"
     assert view_semgrep["installed"]["status"] == "not_configured"
 
-    view_lychee = catalog.asset_view(
-        "docs.link-check", target=LINUX_AMD64, policy=POLICY
-    )
-    assert view_lychee["selection_status"] == "selectable"
+    view_lychee = catalog.asset_view("lychee", target=LINUX_AMD64, policy=POLICY)
+    assert view_lychee["selection_status"] == "unregistered_tool"
     assert len(view_lychee["available"]) == 1
     assert view_lychee["available"][0]["entrypoint"] == "lychee"
 
@@ -145,12 +143,15 @@ def test_assembly_and_views_through_public_catalog():
 def test_oci_releases_preserve_index_boundary_without_inventing_installation(tmp_path):
     records = {r.definition.asset_id: r for r in load_shared_definitions("oci.json")}
     definition = records["semgrep"].definition
-    tool_id = records["semgrep"].tools[0]
 
+    # Frozen selections need a real contract; a test capability id (not the
+    # bare tool key) carries one, associated with the same definition.
     catalog = Catalog()
-    catalog.register(ToolSpec(tool_id, {}, {}, effect="check"), None)
-    catalog.register_asset(definition, tools=(tool_id,))
-    selection = catalog.select_asset(tool_id, target=LINUX_AMD64, policy=POLICY)
+    catalog.register(ToolSpec("oci.pattern-scan", {}, {}, effect="check"), None)
+    catalog.register_asset(definition, tools=("oci.pattern-scan",))
+    selection = catalog.select_asset(
+        "oci.pattern-scan", target=LINUX_AMD64, policy=POLICY
+    )
 
     index = AssetIndex(tmp_path)
     # Unknown outcome records cleanly as unknown
@@ -179,10 +180,10 @@ def test_semgrep_selection_retains_pinned_oci_source_and_entrypoint():
     records = {r.definition.asset_id: r for r in load_shared_definitions("oci.json")}
     definition = records["semgrep"].definition
     catalog = Catalog()
-    catalog.register(ToolSpec("code.pattern-scan", {}, {}, effect="check"), None)
-    catalog.register_asset(definition, tools=("code.pattern-scan",))
+    catalog.register(ToolSpec("oci.pattern-scan", {}, {}, effect="check"), None)
+    catalog.register_asset(definition, tools=("oci.pattern-scan",))
     selection = catalog.select_asset(
-        "code.pattern-scan", target=LINUX_AMD64, policy=POLICY
+        "oci.pattern-scan", target=LINUX_AMD64, policy=POLICY
     )
 
     assert selection.release.source == (

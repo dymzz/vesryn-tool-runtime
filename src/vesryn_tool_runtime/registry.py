@@ -55,13 +55,6 @@ def compose(*catalogs):
 def scoped_catalog(catalog, scope):
     """Wrap existing adapter groups once, retaining each tool's Provider identity."""
     result, adapters = Catalog(), {}
-    for document in catalog.documents():
-        spec, adapter = catalog.resolve(document["tool_id"])
-        guarded = adapters.setdefault(id(adapter), ScopedAdapter(adapter, {}, scope))
-        guarded.specs[spec.tool_id] = spec
-        result.register(spec, guarded)
-        result._providers[spec.tool_id] = catalog.provider_for(spec.tool_id)
-    result.discovery_scope = scope
     for definition in catalog._assets.values():
         result.register_asset(
             definition,
@@ -71,4 +64,15 @@ def scoped_catalog(catalog, scope):
                 if asset_id == definition.asset_id
             ),
         )
+    for document in catalog.documents():
+        spec, adapter = catalog.resolve(document["tool_id"])
+        guarded = adapters.setdefault(id(adapter), ScopedAdapter(adapter, {}, scope))
+        guarded.specs[spec.tool_id] = spec
+        result.register(spec, guarded)
+        result._providers[spec.tool_id] = catalog.provider_for(spec.tool_id)
+    result.discovery_scope = scope
+    for group in catalog._groups.values():
+        result.register_group(group)
+    for access in catalog._accesses.values():
+        result.register_access(access)
     return result

@@ -54,6 +54,7 @@ from .shared_definitions import (
     register_shared_definitions,
     shared_definition_documents,
 )
+from .tool_registration import ToolAsset, ToolGroup
 from .uv_assets import UvLock, UvToolBackend
 
 __all__ = [
@@ -87,6 +88,8 @@ __all__ = [
     "NativeAssetDelivery",
     "SharedAssetDefinition",
     "ToolAdapter",
+    "ToolAsset",
+    "ToolGroup",
     "ToolResult",
     "ToolRuntime",
     "ToolRuntimeError",

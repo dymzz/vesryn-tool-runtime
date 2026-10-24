@@ -18,9 +18,9 @@ Release asset digests, read on 2026-10-24.
 | asset_id | version | target / ABI | entrypoint (archive layout) | sha256 | capability relation |
 | --- | --- | --- | --- | --- | --- |
 | `osv-scanner` | 2.6.0 | linux x86_64, none (static Go) | `osv-scanner` (raw binary) | `ca69b3d3…5b108` | `dependency.vulnerability-scan` — **real**: the capability ECI #51 already selected and consumed; release and identity unchanged from the #8 verification (re-checked 2026-10-24, unchanged). |
-| `actionlint` | 1.7.12 | linux x86_64, none (static Go) | `actionlint` (tar.gz: binary + docs + man) | `8aca8db9…a3d8` | `example.actionlint` — **pending**: ECI main runs the `actionlint_workflows` check, but no formal Runtime capability contract exists yet; ECI #58 owns the real entry. |
-| `shellcheck` | 0.11.0 | linux x86_64, none (static Haskell) | `shellcheck` (tar.xz: `shellcheck-v0.11.0/shellcheck` + LICENSE/README) | `8c3be12b…7198` | `example.shellcheck` — **pending** ECI #58. |
-| `zizmor` | 1.31.1 | linux x86_64, `gnu` (glibc target triple) | `zizmor` (tar.gz: flat binary) | `d185f726…8c99` | `example.zizmor` — **pending** ECI #58. |
+| `actionlint` | 1.7.12 | linux x86_64, none (static Go) | `actionlint` (tar.gz: binary + docs + man) | `8aca8db9…a3d8` | `actionlint` (bare tool key). ECI main runs the `actionlint_workflows` check, but no formal Runtime entry contract exists yet; ECI #58 owns the real entry. |
+| `shellcheck` | 0.11.0 | linux x86_64, none (static Haskell) | `shellcheck` (tar.xz: `shellcheck-v0.11.0/shellcheck` + LICENSE/README) | `8c3be12b…7198` | `shellcheck` (bare tool key) — pending ECI #58. |
+| `zizmor` | 1.31.1 | linux x86_64, `gnu` (glibc target triple) | `zizmor` (tar.gz: flat binary) | `d185f726…8c99` | `zizmor` (bare tool key) — pending ECI #58. |
 
 Full source URLs and exact digests are pinned by
 `tests/test_shared_assets_native.py`; the declarations live only in
@@ -33,13 +33,13 @@ Windows PSScriptAnalyzer stays outside this group.
 ## Assembly status and authorization
 
 - `dependency.vulnerability-scan` is the only formal capability relation; it is
-  backed by ECI #51's actual selection/File-delivery consumption. Registering
-  the document into a catalog without that capability fails `unregistered_tool`.
-- The three `example.*` associations are placeholders, not formal callable
-  capabilities: no empty ToolSpec or `Adapter=None` masquerade exists, and
-  shared registration grants no execution permission. When ECI #58 lands its
-  real check entries, the relation update for these three assets goes through
-  this group (one data-file change), not through consumer-side edits.
+  backed by ECI #51's actual selection/File-delivery consumption, and acquiring
+  through it needs that capability's contract registered.
+- `actionlint`, `shellcheck` and `zizmor` register directly under bare tool
+  primary keys (#32): no empty ToolSpec or placeholder capability exists, and
+  registration grants no execution permission. Selecting them refuses with
+  `unregistered_tool` until ECI #58 lands real check entries; the entry
+  contracts then go through this group's data file, not consumer-side edits.
 - Source declaration success is not installation success and not CI enablement:
   actual scanning remains ECI #58's Linux/Dagger domain.
 

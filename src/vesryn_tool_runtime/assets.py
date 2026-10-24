@@ -299,6 +299,10 @@ def select_asset(
         _token(version)
     _specifier(specifier)
     definition = catalog.asset_for(tool_id, scope=scope)
+    if tool_id not in catalog._tools:
+        # A frozen selection embeds a real contract hash and Provider; a tool
+        # registered only as an asset has neither, and none may be invented.
+        raise AssetError("unregistered_tool")
     if not policy.enabled:
         raise AssetError("selection_disabled")
     releases = [item for item in definition.releases if item.matches(target)]

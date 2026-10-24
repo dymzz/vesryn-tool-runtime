@@ -53,7 +53,7 @@ exactly these top-level fields:
     {
       "asset_id": "hyperfine",
       "catalog_revision": "official-2026-10-23",
-      "tools": ["example.benchmark"],
+      "tools": ["hyperfine"],
       "releases": [
         {
           "version": "2.0.0", "distribution": "native", "backend": "aria2",
@@ -74,7 +74,9 @@ exactly these top-level fields:
   are preserved unchanged.
 - `tools` is a non-empty list of unique tool IDs matching the existing tool ID
   pattern (`domain.operation`, lowercase). It declares which **existing capabilities**
-  the asset serves; it never creates or modifies a capability.
+  the asset serves, as tool primary keys: bare program identities
+  (``trivy``) or real, source-backed capability IDs
+  (``python.dead-code``); it never creates or modifies a capability.
 - The same `asset_id` twice in one document is rejected as `conflicting_asset` at
   read time. Across documents, an identical re-declaration of the same asset is
   idempotent at registration, while differing content for the same `asset_id` keeps
@@ -127,13 +129,11 @@ file. One read from one installed artifact is the packaging proof; no repeated
 installation matrix is required.
 
 The bundled seed `examples.json` carries the already-verified definitions —
-ripgrep 15.2.0 (Windows aarch64/MSVC) serving `example.search`, and hyperfine
-2.0.0/1.20.0 (Windows/Linux x86_64) serving `example.benchmark` — as verified on
-2026-10-23 by the [#6](https://github.com/dymzz/vesryn-tool-runtime/issues/6) and
-[#8](https://github.com/dymzz/vesryn-tool-runtime/issues/8) deliveries. Their
-`example.*` associations are example capability identities, not formal callable
-capabilities; consumers assemble only the documents whose capabilities they
-actually implement.
+ripgrep 15.2.0 (Windows aarch64/MSVC) and hyperfine 2.0.0/1.20.0
+(Windows/Linux x86_64) — as verified on 2026-10-23 by the
+[#6](https://github.com/dymzz/vesryn-tool-runtime/issues/6) and
+[#8](https://github.com/dymzz/vesryn-tool-runtime/issues/8) deliveries, each
+serving its bare tool primary key (`ripgrep`, `hyperfine`) registered directly.
 
 Run the offline sample with `python examples/shared_definitions.py` (installed
 candidate package, or this checkout's `src` on `PYTHONPATH`):
@@ -144,16 +144,15 @@ record = next(
     for r in load_shared_definitions("examples.json")
     if r.definition.asset_id == "hyperfine"
 )
-tools = Catalog()  # a consumer's real capabilities first
-tools.register(ToolSpec("example.benchmark", {}, {}, effect="check"), adapter)
+tools = Catalog()  # no ToolSpec, no adapter, no execution permission
 register_shared_definitions(tools, record)
-view = tools.asset_view("example.benchmark", target=target, policy=policy)
+assert tools.asset_for("hyperfine") is record.definition
 ```
 
-The runnable sample assembles only its seed capabilities. To inspect other groups,
-read their documents independently; assemble only the records whose contracts the
-consumer actually implements. Reading every document does not require assembling
-every capability.
+The runnable sample registers the seed tools directly and shows their
+disclosure views. A registered tool without a real contract stays explicitly
+unselectable; to acquire and run a tool, the consumer registers its actual
+capability contract and selects through it.
 
 ## Path ownership for B/C/D/E
 

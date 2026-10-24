@@ -23,11 +23,12 @@ POLICY = AssetPolicy("eci-tools-2026-10-23")
 FILES = "https://files.pythonhosted.org/packages/"
 
 # Definition digests recorded by engineering-ci #51's frozen asset_documents.
-# vulture, pyright and pylint reproduce that record byte-for-byte; deptry's
-# two platform corrections (os/arch in #17, the glibc abi in #29) necessarily
-# publish different digests.
+# pyright and pylint reproduce that record byte-for-byte; deptry's two
+# platform corrections (os/arch in #17, glibc abi in #29) and vulture's
+# migration of the still-used 2.14 release (#32) necessarily publish
+# different digests.
 DEFINITION_SHA256 = {
-    "vulture": "f1a35415e6df3ddc9e351435c0cc827189f32531c1a449c13e62f20461c531ef",
+    "vulture": "6dbabb57bf200df6885d7a11780ccef1ba6d236467e95dceab865ebf69c97eac",
     "pyright": "4436d29deb3fa56c78e4ede01c48039ca4012a51f489e8d0bc8b5dc9b1f262c1",
     "deptry": "7cf1b54637d47b66d029d018d808843e6ea97af94a2864bea54e81ae6c1db5d6",
     "pylint": "b30fda820a20574e2db44e0c126b2782c4a9b22ed296ed3c80b2eb2c5802724b",
@@ -161,7 +162,10 @@ def test_bundled_python_document_matches_the_eci_identities():
         assert item.tools == (tool_id,)
         assert item.definition.catalog_revision == "eci-tools-2026-10-23"
         assert item.definition.sha256 == DEFINITION_SHA256[asset_id]
-        (release,) = item.definition.releases
+        if len(item.definition.releases) == 1:
+            (release,) = item.definition.releases
+        else:
+            release = item.definition.releases[0]
         assert (
             release.version,
             release.distribution,
@@ -249,3 +253,23 @@ def test_old_deptry_selection_stays_readable_and_unchanged():
     assert current.definition_sha256 != old.definition_sha256
     assert current.artifact_id != old.artifact_id
     assert current.selection_id != old.selection_id
+
+
+def test_vulture_migrates_the_still_used_214_release_with_real_metadata():
+    record = next(item for item in records() if item.definition.asset_id == "vulture")
+    # #32 migrates the release the old uv_tool_prepare path still uses into
+    # the single active source, with PyPI-verified per-release Requires-Python
+    # (the old path flattened both versions to ">=3.8").
+    assert [item.version for item in record.definition.releases] == ["2.16", "2.14"]
+    by_version = {item.version: item for item in record.definition.releases}
+    assert by_version["2.16"].requires_python == ">=3.9"
+    assert by_version["2.14"].requires_python == ">=3.8"
+    assert by_version["2.14"].source.endswith("vulture-2.14-py2.py3-none-any.whl")
+    assert by_version["2.14"].sha256 == (
+        "d9a90dba89607489548a49d557f8bac8112bd25d3cbc8aeef23e860811bd9ed9"
+    )
+    # Publisher order keeps 2.16 as the unresolved default.
+    selection = assembled().select_asset(
+        "python.dead-code", target=LINUX, policy=POLICY
+    )
+    assert selection.release.version == "2.16"

@@ -5,7 +5,9 @@
     {
       "asset_id": "trivy",
       "catalog_revision": "official-2026-10-24",
-      "tools": ["example.trivy"],
+      "tools": [
+        "trivy"
+      ],
       "releases": [
         {
           "version": "0.76.1",

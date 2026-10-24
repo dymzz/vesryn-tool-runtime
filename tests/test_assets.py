@@ -393,8 +393,12 @@ def test_registration_composition_and_scope_wrapping_keep_provider_and_one_asset
     with pytest.raises(AssetError, match="conflicting_asset"):
         combined.merge(conflicting)
     assert combined.documents() == before
+    # Tools register directly by primary key; acquisition still needs a
+    # registered capability, and the missing capability is explicit (#32).
+    tools.register_asset(tools.asset_for("sample.read"), tools=("missing.tool",))
+    assert tools.asset_for("missing.tool") is tools.asset_for("sample.read")
     with pytest.raises(AssetError, match="unregistered_tool"):
-        tools.register_asset(tools.asset_for("sample.read"), tools=("missing.tool",))
+        tools.select_asset("missing.tool", target=TARGET, policy=AssetPolicy("p"))
 
 
 def test_installation_never_changes_existing_binding_digest_or_admission(tmp_path):

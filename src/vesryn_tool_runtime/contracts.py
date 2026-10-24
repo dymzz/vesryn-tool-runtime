@@ -139,6 +139,8 @@ class Catalog:
         self._providers = {}
         self._assets = {}
         self._tool_assets = {}
+        self._groups = {}
+        self._accesses = {}
 
     def register(self, spec: ToolSpec, adapter: ToolAdapter):
         spec = deepcopy(spec)
@@ -147,15 +149,24 @@ class Catalog:
             raise WorkflowError("Duplicate tool registration")
         self._tools[spec.tool_id] = (spec, adapter)
 
+    def _known_tools(self):
+        return self._tools.keys() | self._tool_assets.keys()
+
     def register_asset(self, definition, *, tools):
-        """Associate one immutable CLI release definition with existing capabilities."""
-        from .assets import AssetDefinition, AssetError
+        """Register one immutable CLI release definition under tool primary keys.
+
+        Tools are registered directly by their primary keys; a capability
+        contract (ToolSpec/adapter) is no longer a prerequisite. Registering
+        an asset grants no installation, binding or execution; acquisition
+        through a frozen selection still requires a registered capability.
+        """
+        from .assets import AssetDefinition, AssetError, _token
 
         tools = tuple(tools)
         if not isinstance(definition, AssetDefinition) or not tools:
             raise AssetError("invalid_definition")
-        if any(tool_id not in self._tools for tool_id in tools):
-            raise AssetError("unregistered_tool")
+        for tool_id in tools:
+            _token(tool_id)
         existing = self._assets.get(definition.asset_id)
         if (existing is not None and existing != definition) or any(
             tool_id in self._tool_assets
@@ -166,15 +177,75 @@ class Catalog:
         self._assets[definition.asset_id] = definition
         self._tool_assets.update({tool_id: definition.asset_id for tool_id in tools})
 
-    def asset_for(self, tool_id, *, scope=None):
-        """Read asset metadata; no local state, acquisition or admission is implied."""
-        from .assets import AssetError
+    def register_tool(self, asset):
+        """Register one ToolAsset record: a single tool primary key and its definition."""
+        from .tool_registration import ToolAsset
 
-        if tool_id not in self._tools:
-            raise AssetError("unregistered_tool")
-        self.resolve(tool_id, scope=scope)
+        if not isinstance(asset, ToolAsset):
+            raise WorkflowError("Tool assets register as ToolAsset records")
+        self.register_asset(asset.definition, tools=(asset.tool_id,))
+
+    def register_group(self, group):
+        """Register a ToolGroup whose members reference tools by primary key."""
+        from .tool_registration import ToolGroup
+
+        if not isinstance(group, ToolGroup):
+            raise WorkflowError("Tool groups register as ToolGroup records")
+        unknown = [
+            member for member in group.members if member not in self._known_tools()
+        ]
+        if unknown:
+            raise WorkflowError(f"Tool group references unregistered tools: {unknown}")
+        existing = self._groups.get(group.group_id)
+        if existing is not None:
+            if existing != group:
+                raise WorkflowError("Duplicate tool group registration")
+            return
+        self._groups[group.group_id] = group
+
+    def group_for(self, group_id):
+        if group_id not in self._groups:
+            raise WorkflowError(f"Tool group is not registered: {group_id}")
+        return self._groups[group_id]
+
+    def register_access(self, access):
+        """Register an access entry record (the #27 AccessEntrySummary)."""
+        from .discovery_contracts import AccessEntrySummary
+
+        if not isinstance(access, AccessEntrySummary):
+            raise WorkflowError("Access entries register as AccessEntrySummary")
+        if access.tool_id not in self._known_tools():
+            raise WorkflowError(
+                f"Access entry references an unregistered tool: {access.tool_id}"
+            )
+        existing = self._accesses.get(access.access_id)
+        if existing is not None:
+            if existing != access:
+                raise WorkflowError("Duplicate access entry registration")
+            return
+        self._accesses[access.access_id] = access
+
+    def access_for(self, access_id):
+        if access_id not in self._accesses:
+            raise WorkflowError(f"Access entry is not registered: {access_id}")
+        return self._accesses[access_id]
+
+    def asset_for(self, tool_id, *, scope=None):
+        """Read asset metadata by tool primary key; no acquisition is implied.
+
+        The lookup no longer depends on an old capability ID: a tool registered
+        only as an asset is readable by its primary key. Scope filtering still
+        applies when a capability exists; without one there is nothing to match.
+        """
+        from .assets import AssetError, _token
+
+        _token(tool_id)
         if tool_id not in self._tool_assets:
-            raise AssetError("unregistered_asset")
+            if tool_id in self._tools:
+                raise AssetError("unregistered_asset")
+            raise AssetError("unregistered_tool")
+        if scope is not None or tool_id in self._tools:
+            self.resolve(tool_id, scope=scope)
         return self._assets[self._tool_assets[tool_id]]
 
     def select_asset(
@@ -226,6 +297,10 @@ class Catalog:
             raise WorkflowError("Provider must return the existing Catalog contract")
         if self._tools.keys() & provider._tools.keys():
             raise WorkflowError("Duplicate tool registration across providers")
+        if self._groups.keys() & provider._groups.keys():
+            raise WorkflowError("Duplicate tool group registration across providers")
+        if self._accesses.keys() & provider._accesses.keys():
+            raise WorkflowError("Duplicate access entry registration across providers")
         staged = {}
         for name, (spec, adapter) in provider._tools.items():
             spec = deepcopy(spec)
@@ -243,6 +318,8 @@ class Catalog:
         self._providers.update(identities)
         self._assets.update(provider._assets)
         self._tool_assets.update(provider._tool_assets)
+        self._groups.update(provider._groups)
+        self._accesses.update(provider._accesses)
 
     def documents(self):
         return [

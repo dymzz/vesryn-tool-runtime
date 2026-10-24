@@ -124,8 +124,13 @@ def test_assembly_reuses_existing_registration_and_conflict_reasons(tmp_path):
     selection = tools.select_asset("shared.read", target=TARGET, policy=POLICY)
     assert selection.tool_contract_sha256 == spec.sha256
     assert tools.provider_for("shared.read") == "sample-domain"
+    # Registration no longer needs a capability: an empty catalog takes the
+    # same records directly, by tool primary key (#32).
+    empty = catalog()
+    register_shared_definitions(empty, records)
+    assert empty.asset_for("shared.read") is records[0].definition
     with pytest.raises(AssetError, match="unregistered_tool"):
-        register_shared_definitions(catalog(), records)
+        empty.select_asset("shared.read", target=TARGET, policy=POLICY)
     with pytest.raises(AssetError, match="conflicting_asset"):
         register_shared_definitions(
             tools,
@@ -244,7 +249,7 @@ def test_assembly_does_not_change_provider_or_scope_semantics(tmp_path):
             document({**asset(), "tools": ["shared.read", "shared.read"]}),
             "invalid_definition",
         ),
-        (document({**asset(), "tools": ["not-a-tool-id"]}), "invalid_definition"),
+        (document({**asset(), "tools": ["not a tool id"]}), "invalid_definition"),
         (document({**asset(), "releases": []}), "invalid_definition"),
         (
             document(asset(), asset(revision="other", releases=(release("9.0"),))),
@@ -273,15 +278,138 @@ def test_bounded_document_reading_rejects_duplicate_fields(tmp_path):
         load_shared_definitions(17)
 
 
-def test_bundled_example_capabilities_are_examples_not_formal_capabilities():
+def test_bundled_seed_registers_directly_without_placeholder_capabilities():
     records = {
         record.definition.asset_id: record
         for record in load_shared_definitions("examples.json")
     }
     assert set(records) == {"cli.ripgrep", "hyperfine"}
-    # The bundled seed declares example capabilities only; assembly into a real
-    # consumer catalog keeps requiring that exact capability to exist first.
-    tools = catalog("example.search")
-    register_shared_definitions(tools, records["cli.ripgrep"])
+    # The seed tools are bare program primary keys; they register directly in
+    # a catalog with no ToolSpec or placeholder capability, and acquisition
+    # keeps failing explicitly until a real contract exists.
+    tools = Catalog()
+    register_shared_definitions(tools, records.values())
+    for tool_id in ("ripgrep", "hyperfine"):
+        assert tools.asset_for(tool_id).asset_id in records
+        with pytest.raises(AssetError, match="unregistered_tool"):
+            tools.select_asset(tool_id, target=TARGET, policy=POLICY)
+
+
+def test_unified_registration_supports_groups_entries_and_key_conflicts():
+    from vesryn_tool_runtime import AccessEntrySummary, ToolAsset, ToolGroup
+    from vesryn_tool_runtime.discovery_contracts import compose_access_id
+
+    trivy = next(
+        record
+        for record in load_shared_definitions("security.json")
+        if record.definition.asset_id == "trivy"
+    )
+    tools = Catalog()
+    # A real tool registers directly as a ToolAsset: no empty ToolSpec, no
+    # example.* capability, and no fabricated executable entry.
+    tools.register_tool(ToolAsset("trivy", trivy.definition))
+    assert tools.asset_for("trivy") is trivy.definition
     with pytest.raises(AssetError, match="unregistered_tool"):
-        register_shared_definitions(tools, records["hyperfine"])
+        tools.select_asset("trivy", target=TARGET, policy=POLICY)
+
+    # The same tool primary key joins two groups with several entries.
+    scanners = ToolGroup(
+        "security.scanners",
+        ("trivy",),
+        display_name="Security scanners",
+        aliases=("vuln",),
+    )
+    all_tools = ToolGroup("security.all-tools", ("trivy",))
+    tools.register_group(scanners)
+    tools.register_group(all_tools)
+    assert tools.group_for("security.scanners") is scanners
+    assert tools.group_for("security.all-tools").members == ("trivy",)
+    with pytest.raises(ToolRuntimeError, match="unregistered tools"):
+        tools.register_group(ToolGroup("broken.group", ("absent-tool",)))
+    with pytest.raises(ToolRuntimeError, match="Duplicate tool group"):
+        tools.register_group(
+            ToolGroup("security.scanners", ("trivy",), description="Different")
+        )
+
+    def entry(key, environment):
+        return AccessEntrySummary(
+            tool_id="trivy",
+            catalog_ref="ci",
+            entry_key=key,
+            provider="engineering-ci",
+            environment=environment,
+            purpose="Scan container images and filesystems",
+            contract_version="1",
+            contract_sha256=trivy.definition.releases[0].sha256,
+            discovery_scope="matched",
+        )
+
+    first, second = entry("default", "dagger"), entry("fallback", "host")
+    assert first.access_id == compose_access_id("ci", "trivy", "default")
+    tools.register_access(first)
+    tools.register_access(second)
+    assert tools.access_for(first.access_id) is first
+    assert tools.access_for(second.access_id).entry_key == "fallback"
+    with pytest.raises(ToolRuntimeError, match="unregistered tool"):
+        tools.register_access(
+            AccessEntrySummary(
+                tool_id="absent-tool",
+                catalog_ref="ci",
+                entry_key="default",
+                provider="engineering-ci",
+                environment="dagger",
+                purpose="Never registered",
+                contract_version="1",
+                contract_sha256=trivy.definition.releases[0].sha256,
+                discovery_scope="matched",
+            )
+        )
+    with pytest.raises(ToolRuntimeError, match="Duplicate access entry"):
+        tools.register_access(entry("default", "host"))
+
+    # Explicit composition carries groups and entries and rejects duplicates.
+    other = Catalog()
+    other.register_tool(ToolAsset("trivy", trivy.definition))
+    other.register_group(all_tools)
+    with pytest.raises(ToolRuntimeError, match="Duplicate tool group"):
+        tools.merge(other)
+
+
+def test_composition_carries_groups_and_access_entries():
+    from vesryn_tool_runtime import AccessEntrySummary, ToolAsset, ToolGroup
+    from vesryn_tool_runtime.registry import scoped_catalog
+
+    source = Catalog()
+    source.register_tool(
+        ToolAsset(
+            "shellcheck",
+            next(
+                record.definition
+                for record in load_shared_definitions("native.json")
+                if record.definition.asset_id == "shellcheck"
+            ),
+        )
+    )
+    source.register_group(ToolGroup("shell.quality", ("shellcheck",), aliases=("sh",)))
+    entry = AccessEntrySummary(
+        tool_id="shellcheck",
+        catalog_ref="ci",
+        entry_key="default",
+        provider="engineering-ci",
+        environment="dagger",
+        purpose="Shell script analysis",
+        contract_version="1",
+        contract_sha256="0" * 64,
+        discovery_scope="matched",
+    )
+    source.register_access(entry)
+
+    combined = Catalog()
+    combined.merge(source)
+    assert combined.group_for("shell.quality").aliases == ("sh",)
+    assert combined.access_for(entry.access_id) is entry
+
+    guarded = scoped_catalog(combined, DiscoveryScope(permissions=frozenset({"check"})))
+    assert guarded.group_for("shell.quality") is combined.group_for("shell.quality")
+    assert guarded.access_for(entry.access_id) is entry
+    assert guarded.asset_for("shellcheck") is combined.asset_for("shellcheck")

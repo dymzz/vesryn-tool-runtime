@@ -29,7 +29,7 @@ VERIFIED = {
     "sha256": "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0",
     "entrypoint": "trivy",
     "abi": None,
-    "tools": ("example.trivy",),
+    "tools": ("trivy",),
     "revision": "official-2026-10-24",
 }
 
@@ -76,42 +76,44 @@ def test_security_document_declares_only_the_verified_trivy_asset():
         )
 
 
-def test_trivy_stays_an_unassembled_example_capability():
+def test_trivy_registers_directly_and_stays_without_a_fake_entry():
     record = security_records()["trivy"]
-    # No formal ECI capability contract exists yet (ECI #59 owns the scan/SBOM
-    # check entries); the example association cannot masquerade as one.
-    assert record.tools == ("example.trivy",)
+    # The bare program primary key registers directly with no ToolSpec or
+    # placeholder (#32); until ECI #59 delivers a real scan/SBOM contract,
+    # acquisition refuses explicitly and no callable entry is invented.
+    assert record.tools == ("trivy",)
     tools = Catalog()
     tools.provider_name = "security-shared"
-    with pytest.raises(AssetError, match="unregistered_tool"):
-        register_shared_definitions(tools, record)
-    tools.register(
-        ToolSpec("example.trivy", {}, {}, effect="check"), RecordingAdapter()
-    )
     register_shared_definitions(tools, record)
-    selection = tools.select_asset("example.trivy", target=LINUX, policy=POLICY)
-    assert selection.asset_id == "trivy" and selection.release.version == "0.76.1"
-    assert selection.tool_contract_sha256 == tools.resolve("example.trivy")[0].sha256
+    assert tools.asset_for("trivy") is record.definition
+    with pytest.raises(AssetError, match="unregistered_tool"):
+        tools.select_asset("trivy", target=LINUX, policy=POLICY)
+    linux = tools.asset_view("trivy", target=LINUX, policy=POLICY)
+    assert len(linux["available"]) == 1
+    assert linux["selection_status"] == "unregistered_tool"
     # Only the declared Linux x86_64 target is supported; the static Go build
     # carries no ABI constraint.
-    with pytest.raises(AssetError, match="unsupported_target"):
-        tools.select_asset(
-            "example.trivy",
-            target=AssetTarget("windows", "x86_64", abi="msvc"),
-            policy=POLICY,
-        )
+    windows = tools.asset_view(
+        "trivy", target=AssetTarget("windows", "x86_64", abi="msvc"), policy=POLICY
+    )
+    assert windows["available"] == []
 
 
 def test_trivy_selection_is_offline_and_stable():
     tools = Catalog()
     tools.provider_name = "security-shared"
+    # Frozen selections need a real contract; a test capability id (not the
+    # bare tool key) carries one, associated with the same definition.
     tools.register(
-        ToolSpec("example.trivy", {}, {}, effect="check"), RecordingAdapter()
+        ToolSpec("security.image-scan", {}, {}, effect="check"), RecordingAdapter()
     )
     register_shared_definitions(tools, security_records().values())
-    first = tools.select_asset("example.trivy", target=LINUX, policy=POLICY)
+    tools.register_asset(
+        security_records()["trivy"].definition, tools=("security.image-scan",)
+    )
+    first = tools.select_asset("security.image-scan", target=LINUX, policy=POLICY)
     second = tools.select_asset(
-        "example.trivy", target=LINUX, policy=AssetPolicy("later-revision")
+        "security.image-scan", target=LINUX, policy=AssetPolicy("later-revision")
     )
     # Same artifact content across policy revisions; no install or network fact
     # is implied by selecting.

@@ -18,7 +18,7 @@ child of [Issue #12](https://github.com/dymzz/vesryn-tool-runtime/issues/12).
   Host attempts to select these assets on non-Linux targets (`windows`, `macos`) yield
   `unsupported_target`.
 - **Capability Mapping**: Capabilities are associated with existing engineering-ci operations:
-  `code.pattern-scan` for Semgrep, and `docs.link-check` for Lychee.
+  bare tool keys — `semgrep` and `lychee` — registered directly (#32).
 
 ## Asset Declarations
 
@@ -26,7 +26,7 @@ child of [Issue #12](https://github.com/dymzz/vesryn-tool-runtime/issues/12).
 
 - **Asset ID**: `semgrep`
 - **Catalog Revision**: `official-2026-10-24`
-- **Associated Tool Capability**: `code.pattern-scan`
+- **Tool primary key**: `semgrep` (bare program identity)
 - **Upstream Repository**: `docker.io/semgrep/semgrep`
 - **Upstream Release**: `1.99.0`
 - **Multi-Arch Index Digest**: `sha256:ae27024c16f7848cdbfd49c24ed0b78b13f13b85fcd7b87c679aaa8b0c0dce98`
@@ -47,7 +47,7 @@ child of [Issue #12](https://github.com/dymzz/vesryn-tool-runtime/issues/12).
 
 - **Asset ID**: `lychee`
 - **Catalog Revision**: `official-2026-10-24`
-- **Associated Tool Capability**: `docs.link-check`
+- **Tool primary key**: `lychee` (bare program identity)
 - **Upstream Repository**: `docker.io/lycheeverse/lychee`
 - **Upstream Release Tag**: `lychee-v0.18.0` (Git commit `1780aa0daa70462e296f9811e06178f13fd945db`)
 - **Docker Hub Tag Reference**: `sha-1780aa0` (due to upstream tag matching convention)
@@ -84,8 +84,8 @@ records = load_shared_definitions("oci.json")
 
 # 2. Register real consumer capability adapters
 catalog = Catalog()
-catalog.register(ToolSpec("code.pattern-scan", {}, {}, effect="check"), semgrep_adapter)
-catalog.register(ToolSpec("docs.link-check", {}, {}, effect="check"), lychee_adapter)
+catalog.register_asset(semgrep_definition, tools=("semgrep",))
+catalog.register_asset(lychee_definition, tools=("lychee",))
 
 # 3. Explicit assembly into Catalog
 register_shared_definitions(catalog, records)
@@ -93,11 +93,9 @@ register_shared_definitions(catalog, records)
 # 4. Target platform resolution
 linux_target = AssetTarget(os="linux", arch="x86_64", abi="gnu")
 policy = AssetPolicy("consumer-approved-1")
-view = catalog.asset_view("code.pattern-scan", target=linux_target, policy=policy)
+view = catalog.asset_view("semgrep", target=linux_target, policy=policy)
 assert view["selection_status"] == "selectable"
-selection = catalog.select_asset(
-    "code.pattern-scan", target=linux_target, policy=policy
-)
+selection = catalog.select_asset("semgrep", target=linux_target, policy=policy)
 assert selection.release.sha256 == (
     "374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d"
 )

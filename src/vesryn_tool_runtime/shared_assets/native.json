@@ -5,7 +5,9 @@
     {
       "asset_id": "osv-scanner",
       "catalog_revision": "official-2026-10-23",
-      "tools": ["dependency.vulnerability-scan"],
+      "tools": [
+        "dependency.vulnerability-scan"
+      ],
       "releases": [
         {
           "version": "2.6.0",
@@ -23,7 +25,9 @@
     {
       "asset_id": "actionlint",
       "catalog_revision": "official-2026-10-24",
-      "tools": ["example.actionlint"],
+      "tools": [
+        "actionlint"
+      ],
       "releases": [
         {
           "version": "1.7.12",
@@ -41,7 +45,9 @@
     {
       "asset_id": "shellcheck",
       "catalog_revision": "official-2026-10-24",
-      "tools": ["example.shellcheck"],
+      "tools": [
+        "shellcheck"
+      ],
       "releases": [
         {
           "version": "0.11.0",
@@ -59,7 +65,9 @@
     {
       "asset_id": "zizmor",
       "catalog_revision": "official-2026-10-24",
-      "tools": ["example.zizmor"],
+      "tools": [
+        "zizmor"
+      ],
       "releases": [
         {
           "version": "1.31.1",

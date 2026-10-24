@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from importlib.resources import files as resource_files
 from pathlib import Path
 
-from .assets import AssetDefinition, AssetError, AssetRelease
+from .assets import AssetDefinition, AssetError, AssetRelease, _token
 from .contracts import Catalog
 from .documents import WorkflowError, decode, read
-from .schemas import TOOL, validate
 
 BUNDLED_DIRECTORY = "shared_assets"
 DOCUMENT_KIND = "shared-asset-definitions"
@@ -32,8 +31,10 @@ class SharedAssetDefinition:
             or len(set(self.tools)) != len(self.tools)
         ):
             raise AssetError("invalid_definition")
+        # Tool primary keys: bare program identities or real, source-backed
+        # capability IDs — no capability grammar is imposed on registration.
         for tool_id in self.tools:
-            validate(tool_id, TOOL, label="shared asset capability")
+            _token(tool_id)
 
 
 def _record(entry):
@@ -121,13 +122,13 @@ def load_shared_definitions(source):
 
 
 def register_shared_definitions(catalog, definitions):
-    """Explicitly associate shared definitions with existing catalog capabilities.
+    """Register shared definitions under their tool primary keys, directly.
 
-    Every association reuses Catalog.register_asset: each capability must
-    already be registered, and conflicting ownership keeps its existing
-    AssetError. Adapter readiness and execution admission remain separate.
-    Records apply in order; the first conflict raises while the associations
-    already applied remain.
+    Every association reuses Catalog.register_asset: no capability contract
+    is required, and conflicting ownership keeps its existing AssetError.
+    Registration is not installation, binding or execution permission;
+    acquisition still needs a registered capability. Records apply in order;
+    the first conflict raises while the registrations already applied remain.
     """
     if not isinstance(catalog, Catalog):
         raise WorkflowError("Definitions assemble into the existing Catalog contract")

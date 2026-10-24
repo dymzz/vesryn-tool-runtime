@@ -5,7 +5,9 @@
     {
       "asset_id": "vulture",
       "catalog_revision": "eci-tools-2026-10-23",
-      "tools": ["python.dead-code"],
+      "tools": [
+        "python.dead-code"
+      ],
       "releases": [
         {
           "version": "2.16",
@@ -18,13 +20,27 @@
           "arch": "any",
           "requires_python": ">=3.9",
           "package": "vulture"
+        },
+        {
+          "version": "2.14",
+          "distribution": "python",
+          "backend": "uv",
+          "source": "https://files.pythonhosted.org/packages/a0/56/0cc15b8ff2613c1d5c3dc1f3f576ede1c43868c1bc2e5ccaa2d4bcd7974d/vulture-2.14-py2.py3-none-any.whl",
+          "sha256": "d9a90dba89607489548a49d557f8bac8112bd25d3cbc8aeef23e860811bd9ed9",
+          "entrypoint": "vulture",
+          "os": "any",
+          "arch": "any",
+          "requires_python": ">=3.8",
+          "package": "vulture"
         }
       ]
     },
     {
       "asset_id": "pyright",
       "catalog_revision": "eci-tools-2026-10-23",
-      "tools": ["python.typecheck"],
+      "tools": [
+        "python.typecheck"
+      ],
       "releases": [
         {
           "version": "1.1.414",
@@ -43,7 +59,9 @@
     {
       "asset_id": "deptry",
       "catalog_revision": "eci-tools-2026-10-23",
-      "tools": ["python.dependency-hygiene"],
+      "tools": [
+        "python.dependency-hygiene"
+      ],
       "releases": [
         {
           "version": "0.25.1",
@@ -63,7 +81,9 @@
     {
       "asset_id": "pylint",
       "catalog_revision": "eci-tools-2026-10-23",
-      "tools": ["python.duplicate-code"],
+      "tools": [
+        "python.duplicate-code"
+      ],
       "releases": [
         {
           "version": "4.1.3",

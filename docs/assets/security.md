@@ -22,7 +22,7 @@ assembles with `register_shared_definitions`.
 | source | `https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz` |
 | sha256 | `c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0` |
 | entrypoint | `trivy` (tar.gz: binary + LICENSE + README + 5 `contrib/` templates, 8 files) |
-| capability relation | `example.trivy` — **pending**: no formal Runtime capability contract exists yet; ECI #59 owns the scan/SBOM check entries. |
+| tool primary key | `trivy` (bare program identity). No formal entry contract exists yet; ECI #59 owns the scan/SBOM entries, so acquisition refuses explicitly until then. |
 
 The digest is the publisher GitHub Release asset digest read on 2026-10-24 and
 cross-checked against the publisher's `trivy_0.76.1_checksums.txt` (the release

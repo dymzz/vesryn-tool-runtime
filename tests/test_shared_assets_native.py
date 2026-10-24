@@ -46,7 +46,7 @@ VERIFIED = {
         "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8",
         "entrypoint": "actionlint",
         "abi": None,
-        "tools": ("example.actionlint",),
+        "tools": ("actionlint",),
         "revision": "official-2026-10-24",
     },
     "shellcheck": {
@@ -58,7 +58,7 @@ VERIFIED = {
         "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198",
         "entrypoint": "shellcheck",
         "abi": None,
-        "tools": ("example.shellcheck",),
+        "tools": ("shellcheck",),
         "revision": "official-2026-10-24",
     },
     "zizmor": {
@@ -70,7 +70,7 @@ VERIFIED = {
         "sha256": "d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99",
         "entrypoint": "zizmor",
         "abi": "gnu",
-        "tools": ("example.zizmor",),
+        "tools": ("zizmor",),
         "revision": "official-2026-10-24",
     },
 }
@@ -139,53 +139,56 @@ def test_osv_relation_and_release_reuse_the_verified_delivery():
 
 
 @pytest.mark.parametrize("asset_id", ["actionlint", "shellcheck", "zizmor"])
-def test_new_tools_target_linux_only_and_stay_unassembled_examples(asset_id):
+def test_new_tools_register_directly_and_stay_without_fake_entries(asset_id):
     record = native_records()[asset_id]
-    # No formal ECI capability exists yet (ECI #58 owns the real check
-    # entries); the example association cannot masquerade as one.
-    assert record.tools[0].startswith("example.")
-    tools = native_catalog(record.tools[0])
+    # Bare program primary keys register directly with no capability; no
+    # fabricated contract or callable entry is invented (#32), and selecting
+    # keeps failing explicitly until ECI #58 delivers real check entries.
+    assert record.tools == (asset_id,)
+    tools = Catalog()
     register_shared_definitions(tools, record)
-    selection = tools.select_asset(record.tools[0], target=LINUX, policy=POLICY)
-    assert selection.asset_id == asset_id
-    with pytest.raises(AssetError, match="unsupported_target"):
-        tools.select_asset(
-            record.tools[0],
-            target=AssetTarget("windows", "x86_64", abi="msvc"),
-            policy=POLICY,
-        )
-    if asset_id == "zizmor":
-        # The glibc-targeted build requires an exact ABI match.
-        with pytest.raises(AssetError, match="unsupported_target"):
-            tools.select_asset(
-                record.tools[0],
-                target=AssetTarget("linux", "x86_64"),
-                policy=POLICY,
-            )
+    assert tools.asset_for(asset_id) is record.definition
+    with pytest.raises(AssetError, match="unregistered_tool"):
+        tools.select_asset(asset_id, target=LINUX, policy=POLICY)
+    linux = tools.asset_view(asset_id, target=LINUX, policy=POLICY)
+    assert len(linux["available"]) == 1
+    assert linux["selection_status"] == "unregistered_tool"
+    windows = tools.asset_view(
+        asset_id, target=AssetTarget("windows", "x86_64", abi="msvc"), policy=POLICY
+    )
+    assert windows["available"] == []
 
 
-def test_assembly_selects_all_four_through_the_public_interface():
-    tools = native_catalog(*all_declared_tools())
-    register_shared_definitions(tools, native_records().values())
-    for asset_id, record in native_records().items():
-        for tool_id in record.tools:
-            selection = tools.select_asset(tool_id, target=LINUX, policy=POLICY)
-            assert selection.asset_id == asset_id
-            assert selection.release.sha256 == VERIFIED[asset_id]["sha256"]
-            assert selection.tool_contract_sha256 == tools.resolve(tool_id)[0].sha256
-    osv = tools.select_asset(
+def test_all_four_register_through_the_public_interface():
+    # The whole document loads into a catalog with no ToolSpec at all; the
+    # one source-backed capability (ECI #51's) can additionally register a
+    # contract and select, the bare-keyed tools stay explicitly unselectable.
+    records = native_records()
+    tools = Catalog()
+    register_shared_definitions(tools, records.values())
+    for record in records.values():
+        assert tools.asset_for(record.tools[0]) is record.definition
+    osv = native_catalog("dependency.vulnerability-scan")
+    register_shared_definitions(osv, native_records()["osv-scanner"])
+    selection = osv.select_asset(
         "dependency.vulnerability-scan", target=LINUX, policy=POLICY
     )
-    assert osv.asset_id == "osv-scanner" and osv.release.version == "2.6.0"
+    assert selection.asset_id == "osv-scanner" and selection.release.version == "2.6.0"
+    assert (
+        selection.tool_contract_sha256
+        == osv.resolve("dependency.vulnerability-scan")[0].sha256
+    )
 
 
-def test_shared_registration_grants_nothing_without_real_capabilities():
+def test_shared_registration_grants_nothing_without_real_contracts():
     records = native_records()
-    tools = native_catalog("example.actionlint", "example.shellcheck")
-    # Assembling the whole document needs every declared capability to exist.
-    with pytest.raises(AssetError, match="unregistered_tool"):
-        register_shared_definitions(tools, records.values())
-    # A capability without any asset keeps its existing explicit answer.
+    tools = Catalog()
+    # Registration needs no capability; acquisition without a contract is an
+    # explicit refusal, never a fabricated callable entry.
+    register_shared_definitions(tools, records.values())
+    for record in records.values():
+        with pytest.raises(AssetError, match="unregistered_tool"):
+            tools.select_asset(record.tools[0], target=LINUX, policy=POLICY)
     bare = native_catalog("example.bare")
     with pytest.raises(AssetError, match="unregistered_asset"):
         bare.asset_for("example.bare")
