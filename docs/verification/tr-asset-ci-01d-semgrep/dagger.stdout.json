@@ -1,0 +1,15 @@
+{
+    "container": {
+        "from": {
+            "withEntrypoint": {
+                "withEnvVariable": {
+                    "withExec": {
+                        "exitCode": 0,
+                        "stderr": "\nA new version of Semgrep is available. See https://semgrep.dev/docs/upgrading\n",
+                        "stdout": "1.99.0\n"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,147 @@
+2026/10/24 11:28:40 WARN failed to open git repository err="core.repositoryformatversion does not support extension: worktreeconfig"
+1   : 2de9685f25648790: connect
+1   : 2de9685f25648790: [0.0s] | 11:28:40 WRN failed to get stable ID, defaulting to random value error="failed to rename stable ID temp file: rename C:\\Users\\Aurola\\AppData\\Local\\dagger\\stable_client_id1438254910 C:\\Users\\Aurola\\AppData\\Local\\dagger\\stable_client_id: The process cannot access the file because it is being used by another process."
+2   : cd3f02858f43f755: ┆ exec docker version
+2   : cd3f02858f43f755: ┆ [2.9s] | Client:
+2   : cd3f02858f43f755: ┆ [2.9s] |  Version:           29.8.2
+2   : cd3f02858f43f755: ┆ [2.9s] |  API version:       1.56
+2   : cd3f02858f43f755: ┆ [2.9s] |  Go version:        go1.26.8
+2   : cd3f02858f43f755: ┆ [2.9s] |  Git commit:        7fc2dff
+2   : cd3f02858f43f755: ┆ [2.9s] |  Built:             Wed Sep 30 19:35:42 2026
+2   : cd3f02858f43f755: ┆ [2.9s] |  OS/Arch:           windows/amd64
+2   : cd3f02858f43f755: ┆ [2.9s] |  Context:           desktop-linux
+2   : cd3f02858f43f755: ┆ [2.9s] | 
+2   : cd3f02858f43f755: ┆ [2.9s] | Server: Docker Desktop 4.95.0 (242831)
+2   : cd3f02858f43f755: ┆ [2.9s] |  Engine:
+2   : cd3f02858f43f755: ┆ [2.9s] |   Version:          29.8.2
+2   : cd3f02858f43f755: ┆ [2.9s] |   API version:      1.56 (minimum version 1.40)
+2   : cd3f02858f43f755: ┆ [2.9s] |   Go version:       go1.26.8
+2   : cd3f02858f43f755: ┆ [2.9s] |   Git commit:       8af9fe3
+2   : cd3f02858f43f755: ┆ [2.9s] |   Built:            Wed Sep 30 19:32:25 2026
+2   : cd3f02858f43f755: ┆ [2.9s] |   OS/Arch:          linux/amd64
+2   : cd3f02858f43f755: ┆ [2.9s] |   Experimental:     false
+2   : cd3f02858f43f755: ┆ [2.9s] |  containerd:
+2   : cd3f02858f43f755: ┆ [2.9s] |   Version:          v2.3.6
+2   : cd3f02858f43f755: ┆ [2.9s] |   GitCommit:        ee2735368117d2eb259779949d5e75cdafec9761
+2   : cd3f02858f43f755: ┆ [2.9s] |  runc:
+2   : cd3f02858f43f755: ┆ [2.9s] |   Version:          1.5.1
+2   : cd3f02858f43f755: ┆ [2.9s] |   GitCommit:        v1.5.1-0-g8f2685a4
+2   : cd3f02858f43f755: ┆ [2.9s] |  docker-init:
+2   : cd3f02858f43f755: ┆ [2.9s] |   Version:          0.19.0
+2   : cd3f02858f43f755: ┆ [2.9s] |   GitCommit:        de40ad0
+1   : 2de9685f25648790: connect
+1   : 2de9685f25648790: [3.0s] | cloud url=https://dagger.cloud/traces/setup
+2   : cd3f02858f43f755: ┆ exec docker version DONE [3.0s]
+3   : b30307364293d0f7: ┆ starting engine
+4   : 95614dd8d6e44ed3: ┆ ┆ create container
+5   : 0cbc212d810dbb5d: ┆ ┆ ┆ exec docker container inspect dagger-engine-v1.0.0-beta.16 --format {{ .ID }}
+5   : 0cbc212d810dbb5d: ┆ ┆ ┆ [0.6s] | 2b6dab109e71e3ab2c4dac24ca26f2663a223facec926dcf6e03ddc084036049
+5   : 0cbc212d810dbb5d: ┆ ┆ ┆ exec docker container inspect dagger-engine-v1.0.0-beta.16 --format {{ .ID }} DONE [0.7s]
+6   : 1d9d11c97a107555: ┆ ┆ ┆ exec docker start dagger-engine-v1.0.0-beta.16
+6   : 1d9d11c97a107555: ┆ ┆ ┆ [0.3s] | dagger-engine-v1.0.0-beta.16
+6   : 1d9d11c97a107555: ┆ ┆ ┆ exec docker start dagger-engine-v1.0.0-beta.16 DONE [0.4s]
+7   : 306d1206bf4e1961: ┆ ┆ ┆ exec docker ps -a --format {{.Names}}
+8   : ce9b09a3d12db518: ┆ connecting to engine
+8   : ce9b09a3d12db518: ┆ [0.0s] | 11:28:44 DBG connecting runner=image://registry.dagger.io/engine:v1.0.0-beta.16
+9   : a5c129de4f3d9011: ┆ ┆ creating client
+10  : 6621cbf203767aad: ┆ ┆ ┆ moby.buildkit.v1.Control/Info
+3   : b30307364293d0f7: ┆ starting engine
+4   : 95614dd8d6e44ed3: ┆ ┆ create container
+7   : 306d1206bf4e1961: ┆ ┆ ┆ exec docker ps -a --format {{.Names}}
+7   : 306d1206bf4e1961: ┆ ┆ ┆ [0.2s] | dagger-engine-v1.0.0-beta.16
+7   : 306d1206bf4e1961: ┆ ┆ ┆ [0.2s] | docker-socket-proxy
+7   : 306d1206bf4e1961: ┆ ┆ ┆ exec docker ps -a --format {{.Names}} DONE [0.3s]
+4   : 95614dd8d6e44ed3: ┆ ┆ create container DONE [1.1s]
+3   : b30307364293d0f7: ┆ starting engine DONE [1.1s]
+8   : ce9b09a3d12db518: ┆ connecting to engine
+9   : a5c129de4f3d9011: ┆ ┆ creating client
+10  : 6621cbf203767aad: ┆ ┆ ┆ moby.buildkit.v1.Control/Info DONE [1.9s]
+11  : 45997859dec8f504: ┆ ┆ ┆ moby.buildkit.v1.Control/Info
+11  : 45997859dec8f504: ┆ ┆ ┆ moby.buildkit.v1.Control/Info DONE [0.0s]
+9   : a5c129de4f3d9011: ┆ ┆ creating client DONE [1.9s]
+12  : 6501011ff4971f2e: ┆ ┆ configuring image store
+12  : 6501011ff4971f2e: ┆ ┆ configuring image store DONE [0.0s]
+8   : ce9b09a3d12db518: ┆ connecting to engine
+8   : ce9b09a3d12db518: ┆ [1.9s] | 11:28:46 INF connected name=2b6dab109e71 client-version=v1.0.0-beta.16 server-version=v1.0.0-beta.16+2d95ef98
+8   : ce9b09a3d12db518: ┆ connecting to engine DONE [1.9s]
+13  : b2d9bebd0c3a8a72: ┆ starting session
+13  : b2d9bebd0c3a8a72: ┆ starting session DONE [0.5s]
+14  : 575dab4c0259a6bc: ┆ subscribing to telemetry
+15  : e2431011df9e25d9: ┆ ┆ consuming /v1/traces
+15  : e2431011df9e25d9: ┆ ┆ consuming /v1/traces DONE [0.1s]
+16  : e4c682f70622101d: ┆ ┆ consuming /v1/logs
+16  : e4c682f70622101d: ┆ ┆ consuming /v1/logs DONE [0.0s]
+17  : e884137875492745: ┆ ┆ consuming /v1/metrics
+17  : e884137875492745: ┆ ┆ consuming /v1/metrics DONE [0.0s]
+14  : 575dab4c0259a6bc: ┆ subscribing to telemetry DONE [0.1s]
+1   : 2de9685f25648790: connect DONE [6.7s]
+
+18  : 6eba22ea55eb6b1f: POST /query
+19  : 8850f2999d965ffb: ┆ container(platform: "linux/amd64"): Container!
+19  : 8850f2999d965ffb: ┆ container CACHED [0.0s]
+20  : 304126b519543ce1: ┆ Container.from(address: "docker.io/semgrep/semgrep@sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d"): Container!
+20  : 304126b519543ce1: ┆ Container.from CACHED [0.0s]
+21  : bd42d05fb55a2c87: ┆ Container.withEntrypoint(args: []): Container!
+22  : 62359dd2e9f64fd7: ┆ ┆ Container.withEntrypoint(args: []): Container!
+23  : 3a37a3f73c238b1b: ┆ ┆ ┆ dagql.publishResult
+23  : 3a37a3f73c238b1b: ┆ ┆ ┆ dagql.publishResult DONE [0.2s]
+22  : 62359dd2e9f64fd7: ┆ ┆ Container.withEntrypoint DONE [0.1s]
+21  : bd42d05fb55a2c87: ┆ Container.withEntrypoint DONE [0.3s]
+24  : 9a911bc2c8bb9e17: ┆ withEnvVariable VESRYN_EVIDENCE_RUN=semgrep-20261024T032747Z
+25  : 01bbaabcf0e296a2: ┆ ┆ withEnvVariable VESRYN_EVIDENCE_RUN=semgrep-20261024T032747Z
+26  : 882a3309788d1101: ┆ ┆ ┆ dagql.publishResult
+26  : 882a3309788d1101: ┆ ┆ ┆ dagql.publishResult DONE [0.1s]
+25  : 01bbaabcf0e296a2: ┆ ┆ Container.withEnvVariable DONE [0.0s]
+24  : 9a911bc2c8bb9e17: ┆ Container.withEnvVariable DONE [0.1s]
+27  : 2648be5768aa8ae7: ┆ withExec semgrep --version (expect: ANY)
+28  : c2408b8c67775383: ┆ ┆ withExec semgrep --version (expect: ANY)
+29  : f6f21e1978eaf7f9: ┆ ┆ ┆ dagql.publishResult
+29  : f6f21e1978eaf7f9: ┆ ┆ ┆ dagql.publishResult DONE [0.0s]
+28  : c2408b8c67775383: ┆ ┆ Container.withExec DONE [0.0s]
+30  : d1afdc1d2c2e044f: ┆ ┆ resume withExec (metadata)
+30  : d1afdc1d2c2e044f: ┆ ┆ resume withExec (metadata) DONE [0.0s]
+31  : 37205f6897713a8d: ┆ ┆ resume withExec (execOutputs)
+32  : f7f03bfa64efc32d: ┆ Container.exitCode: Int!
+33  : e60d3fdb3ec9315f: ┆ ┆ Container.exitCode: Int!
+34  : 4454fdb772589cf2: ┆ Container.stderr: String!
+35  : 897cf0904ac2f8a1: ┆ ┆ Container.stderr: String!
+36  : d33f82bba58cf861: ┆ Container.stdout: String!
+37  : 1f9ee5f1f1fff83d: ┆ ┆ Container.stdout: String!
+27  : 2648be5768aa8ae7: ┆ withExec semgrep --version (expect: ANY)
+38  : 7abfd7365caa5d5c: ┆ ┆ withExec semgrep --version (expect: ANY)
+27  : 2648be5768aa8ae7: ┆ withExec semgrep --version (expect: ANY)
+27  : 2648be5768aa8ae7: ┆ [9.2s] | 1.99.0
+27  : 2648be5768aa8ae7: ┆ [14.7s] | 
+27  : 2648be5768aa8ae7: ┆ [14.7s] | A new version of Semgrep is available. See https://semgrep.dev/docs/upgrading
+38  : 7abfd7365caa5d5c: ┆ ┆ withExec semgrep --version (expect: ANY)
+39  : 95c9a2ca98bcfda4: ┆ ┆ ┆ exec.containerStart
+39  : 95c9a2ca98bcfda4: ┆ ┆ ┆ exec.containerStart DONE [0.1s]
+40  : 381ea8c820552de1: ┆ ┆ ┆ exec.processRun
+40  : 381ea8c820552de1: ┆ ┆ ┆ exec.processRun DONE [14.0s]
+38  : 7abfd7365caa5d5c: ┆ ┆ Container.withExec DONE [14.7s]
+31  : 37205f6897713a8d: ┆ ┆ resume withExec (execOutputs) DONE [15.0s]
+27  : 2648be5768aa8ae7: ┆ Container.withExec DONE [15.1s]
+32  : f7f03bfa64efc32d: ┆ Container.exitCode: Int!
+33  : e60d3fdb3ec9315f: ┆ ┆ Container.exitCode: Int!
+41  : 9006875f9c4a1d92: ┆ ┆ ┆ dagql.publishResult
+41  : 9006875f9c4a1d92: ┆ ┆ ┆ dagql.publishResult DONE [0.0s]
+33  : e60d3fdb3ec9315f: ┆ ┆ Container.exitCode DONE [0.1s, waited on semgrep --version]
+32  : f7f03bfa64efc32d: ┆ Container.exitCode DONE [0.1s, waited on semgrep --version]
+34  : 4454fdb772589cf2: ┆ Container.stderr: String!
+35  : 897cf0904ac2f8a1: ┆ ┆ Container.stderr: String!
+42  : a35f6f3ca61438ae: ┆ ┆ ┆ dagql.publishResult
+42  : a35f6f3ca61438ae: ┆ ┆ ┆ dagql.publishResult DONE [0.0s]
+35  : 897cf0904ac2f8a1: ┆ ┆ Container.stderr DONE [0.1s, waited on semgrep --version]
+34  : 4454fdb772589cf2: ┆ Container.stderr DONE [0.1s, waited on semgrep --version]
+36  : d33f82bba58cf861: ┆ Container.stdout: String!
+37  : 1f9ee5f1f1fff83d: ┆ ┆ Container.stdout: String!
+43  : fe45acabeb0446a2: ┆ ┆ ┆ dagql.publishResult
+43  : fe45acabeb0446a2: ┆ ┆ ┆ dagql.publishResult DONE [0.0s]
+37  : 1f9ee5f1f1fff83d: ┆ ┆ Container.stdout DONE [0.1s, waited on semgrep --version]
+36  : d33f82bba58cf861: ┆ Container.stdout DONE [0.1s, waited on semgrep --version]
+18  : 6eba22ea55eb6b1f: POST /query DONE [16.6s]
+
+
+Setup tracing at https://dagger.cloud/traces/setup. To hide set DAGGER_NO_NAG=1
+
+11:28:46 DBG subscribing to telemetry client=y4vadx8mvwcqa2kq1x30365cb remote=image://registry.dagger.io/engine:v1.0.0-beta.16

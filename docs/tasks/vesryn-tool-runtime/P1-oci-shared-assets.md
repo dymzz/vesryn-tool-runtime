@@ -64,12 +64,14 @@ digests in `sha256`. Tags are never used as digests.
 
 ## Directed Acceptance and Verification
 
-Verified on 2026-10-24 with CPython 3.14.8:
+Original implementation results reported on 2026-10-24 with CPython 3.14.8 are listed below. The Semgrep execution row now links a separate follow-up capture; the historical Python test results were not rerun for this evidence-only change:
 
 | Directed evidence | Result |
 | --- | --- |
 | Group D test suite | `tests/test_shared_assets_oci.py` passed (7/7 tests). |
 | Full regression suite | 159 passed, 1 skipped (0 regressions). |
 | Static analysis & format | `uv run ruff check` and `uv run ruff format --check` clean. |
-| Live Dagger native execution | Semgrep 1.99.0 container pulled by immutable digest `docker.io/semgrep/semgrep@sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d`; ran `semgrep --version`, verified stdout `1.99.0`. |
+| Live Dagger native execution | The original result in `docs/verification/tr-asset-ci-01d.json` lacks a native run locator. Separate follow-up [raw Dagger evidence](../../verification/tr-asset-ci-01d-semgrep/README.md) records the same pinned Linux amd64 image, one actual execution of `semgrep --version`, stdout `1.99.0`, and container/CLI exit codes 0. Image acquisition was cached; no new pull, scan or other platform is claimed. |
 | Upstream provenance verification | Docker Hub registry index and platform manifests verified for Semgrep and Lychee. Lychee commit SHA `1780aa0daa70462e296f9811e06178f13fd945db` mapped to tag `sha-1780aa0`. |
+
+The offline OCI tests check declarations and selection only. Their success is not live Dagger evidence. The separate follow-up preserves the original report and captures the query, native response, native diagnostics and process record with SHA-256 references.

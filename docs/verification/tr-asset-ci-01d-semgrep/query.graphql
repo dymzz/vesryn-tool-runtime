@@ -1,0 +1,15 @@
+query SemgrepOciEvidence {
+  container(platform: "linux/amd64") {
+    from(address: "docker.io/semgrep/semgrep@sha256:374d5a678b58e9ba3ef291ce37ffa836f69150a2360c78f02dca7a07bc42fb7d") {
+      withEntrypoint(args: []) {
+        withEnvVariable(name: "VESRYN_EVIDENCE_RUN", value: "semgrep-20261024T032747Z") {
+          withExec(args: ["semgrep", "--version"], expect: ANY) {
+            stdout
+            stderr
+            exitCode
+          }
+        }
+      }
+    }
+  }
+}
