@@ -13,7 +13,8 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import urlsplit
 
 from filelock import FileLock, Timeout
 from packaging.utils import canonicalize_name
@@ -32,13 +33,35 @@ _HOST_ARCH = {
     "aarch64": "aarch64",
 }
 # Targets uv can resolve for; anything else is an unsupported target, not a guess.
+# Linux triples must state the target's real C library: an unknown Linux ABI
+# cannot produce a truthful triple and is rejected instead of silently
+# resolved as GNU. Windows/macOS wheels carry no libc choice.
 _UV_PLATFORM = {
     ("windows", "x86_64"): "x86_64-pc-windows-msvc",
-    ("linux", "x86_64"): "x86_64-unknown-linux-gnu",
-    ("linux", "aarch64"): "aarch64-unknown-linux-gnu",
     ("macos", "aarch64"): "aarch64-apple-darwin",
     ("macos", "x86_64"): "x86_64-apple-darwin",
 }
+_UV_LIBC_PLATFORM = {
+    ("x86_64", "gnu"): "x86_64-unknown-linux-gnu",
+    ("x86_64", "musl"): "x86_64-unknown-linux-musl",
+    ("aarch64", "gnu"): "aarch64-unknown-linux-gnu",
+    ("aarch64", "musl"): "aarch64-unknown-linux-musl",
+}
+
+
+def _wheel_libc(release):
+    """The C library a platform wheel's own filename requires, if any.
+
+    Per the PyPA platform tag specification, ``manylinux`` means glibc and
+    ``musllinux`` means musl. This is read from the actual artifact name, so a
+    mislabeled declaration cannot pass execution admission on the wrong libc.
+    """
+    name = PurePosixPath(urlsplit(release.source).path).name
+    if "musllinux" in name:
+        return "musl"
+    if "manylinux" in name:
+        return "gnu"
+    return None
 
 
 def _host():
@@ -170,7 +193,13 @@ class UvToolBackend:
         if release.distribution != "python" or release.backend != "uv":
             raise AssetError("invalid_backend")
         target = selection.target
-        python_platform = _UV_PLATFORM.get((target.os, target.arch))
+        libc = _wheel_libc(release)
+        if libc is not None and (target.os != "linux" or target.abi != libc):
+            raise AssetError("unsupported_target")
+        if target.os == "linux":
+            python_platform = _UV_LIBC_PLATFORM.get((target.arch, target.abi))
+        else:
+            python_platform = _UV_PLATFORM.get((target.os, target.arch))
         if python_platform is None or target.python is None:
             raise AssetError("unsupported_target")
         return python_platform

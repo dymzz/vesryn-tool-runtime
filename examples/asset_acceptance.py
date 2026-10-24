@@ -205,6 +205,7 @@ def main():
             AssetTarget(
                 os_name,
                 arch,
+                abi="gnu" if os_name == "linux" else None,
                 python=f"{sys.version_info.major}.{sys.version_info.minor}",
             ),
             uv,
@@ -245,7 +246,7 @@ def main():
     )
     selection = catalog.select_asset(
         "vulture.version",
-        target=AssetTarget("linux", "x86_64", python="3.14"),
+        target=AssetTarget("linux", "x86_64", abi="gnu", python="3.14"),
         policy=policy,
         version="2.16",
     )

@@ -72,7 +72,14 @@ it with `uv pip install --require-hashes -r`; a Windows `.venv` is never copied.
   receipt document keeps only status and exit code, never uv output.
 - **Unsupported hosts** (target OS/architecture differs from this host, or an
   unknown uv platform, or no `target.python`) raise `AssetError("unsupported_target")`
-  before anything is touched.
+  before anything is touched. Since issue #29 the resolved triple follows the
+  target's real C library: Linux requires an explicit `abi` of `gnu` or `musl`
+  (`x86_64-unknown-linux-gnu` / `x86_64-unknown-linux-musl`, likewise aarch64);
+  an ABI-less Linux target states an unknown libc and is rejected instead of
+  silently resolved as GNU. The wheel's own filename is authoritative at
+  admission — a `manylinux` (glibc) or `musllinux` name only reaches a Linux
+  target with the matching `abi`, so mislabeled declarations or old frozen
+  selections cannot execute on the wrong libc.
 - **Later reality.** `installed` re-runs `uv pip check` offline and recomputes the
   `environment_id`. A damaged environment is `invalid` and a removed one `missing`;
   a cleared uv cache alone does not break a self-contained environment and is not

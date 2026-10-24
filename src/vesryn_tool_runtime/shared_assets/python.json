@@ -54,6 +54,7 @@
           "entrypoint": "deptry",
           "os": "linux",
           "arch": "x86_64",
+          "abi": "gnu",
           "requires_python": ">=3.10",
           "package": "deptry"
         }

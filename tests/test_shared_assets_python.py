@@ -17,20 +17,23 @@ from vesryn_tool_runtime import (
     shared_definition_documents,
 )
 
-LINUX = AssetTarget("linux", "x86_64", python="3.14")
+LINUX = AssetTarget("linux", "x86_64", abi="gnu", python="3.14")
 WINDOWS = AssetTarget("windows", "x86_64", python="3.14")
 POLICY = AssetPolicy("eci-tools-2026-10-23")
 FILES = "https://files.pythonhosted.org/packages/"
 
 # Definition digests recorded by engineering-ci #51's frozen asset_documents.
-# vulture, pyright and pylint reproduce that record byte-for-byte; the deptry
-# platform correction necessarily publishes a different digest.
+# vulture, pyright and pylint reproduce that record byte-for-byte; deptry's
+# two platform corrections (os/arch in #17, the glibc abi in #29) necessarily
+# publish different digests.
 DEFINITION_SHA256 = {
     "vulture": "f1a35415e6df3ddc9e351435c0cc827189f32531c1a449c13e62f20461c531ef",
     "pyright": "4436d29deb3fa56c78e4ede01c48039ca4012a51f489e8d0bc8b5dc9b1f262c1",
-    "deptry": "94f8982819a48c8f3069a6bf3068deb4a71944301336ccb92ab7f16159f4cc97",
+    "deptry": "7cf1b54637d47b66d029d018d808843e6ea97af94a2864bea54e81ae6c1db5d6",
     "pylint": "b30fda820a20574e2db44e0c126b2782c4a9b22ed296ed3c80b2eb2c5802724b",
 }
+# The wheel each release actually points at: only deptry's is platform-built.
+EXPECTED_ABI = {"vulture": None, "pyright": None, "deptry": "gnu", "pylint": None}
 OLD_DEPTRY_DEFINITION_SHA256 = (
     "6ee56d9c4e3cfcc822564071d959a61b96972874c38b901e68a93305c7a66320"
 )
@@ -180,7 +183,7 @@ def test_bundled_python_document_matches_the_eci_identities():
             package,
             os_name,
             arch,
-            None,
+            EXPECTED_ABI[asset_id],
             package,
             requires_python,
         )
@@ -200,15 +203,28 @@ def test_assembly_reuses_registered_capabilities_for_linux_selections():
 
 def test_deptry_platform_correction_blocks_incompatible_targets():
     tools = assembled()
-    with pytest.raises(AssetError, match="unsupported_target"):
-        tools.select_asset("python.dependency-hygiene", target=WINDOWS, policy=POLICY)
-    # The three universal wheels keep serving either host; only the corrected
-    # declaration is platform-bound.
+    # The manylinux (glibc) wheel serves neither Windows, nor an explicit musl
+    # target, nor a target whose C library is unknown (#29).
+    for target in (
+        WINDOWS,
+        AssetTarget("linux", "x86_64", abi="musl", python="3.14"),
+        AssetTarget("linux", "x86_64", python="3.14"),
+    ):
+        with pytest.raises(AssetError, match="unsupported_target"):
+            tools.select_asset(
+                "python.dependency-hygiene", target=target, policy=POLICY
+            )
+    # The three universal wheels are genuinely platform-independent and keep
+    # serving either host and either C library.
     for tool_id in ("python.dead-code", "python.typecheck", "python.duplicate-code"):
-        assert (
-            tools.select_asset(tool_id, target=WINDOWS, policy=POLICY).release.os
-            == "any"
-        )
+        for target in (
+            WINDOWS,
+            AssetTarget("linux", "x86_64", abi="musl", python="3.14"),
+        ):
+            assert (
+                tools.select_asset(tool_id, target=target, policy=POLICY).release.os
+                == "any"
+            )
 
 
 def test_old_deptry_selection_stays_readable_and_unchanged():
