@@ -97,3 +97,19 @@ its separate #14 acceptance is not part of this asset-consumer patch.
   algorithm is introduced. See
   [discovery field contracts](discovery-contracts.md) and the
   [issue #27 delivery](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md).
+
+## Unreleased
+
+- Add trusted security-policy consumption for TR-POLICY-01 (issue #13): the
+  Runtime side of the engineering-ci #56 publisher contract. A verified
+  `engineering-ci-security-policy-snapshot` parses into
+  `SecurityPolicySnapshot`; `decide_asset_admission` evaluates a real
+  `AssetSelection` (tool key, version, platform, source, digest, optional
+  access entry) with deny-over-allow, decision-time window re-checks and the
+  publisher's exact decision kind/reasons; `admit_protected_asset` gates
+  protected delivery/invocation on an actual allow plus the existing Scope
+  admission, refusing missing/expired/superseded/rolled-back trust without
+  rewriting receipts or treating unknown as allowed. Unprotected callers keep
+  the existing explicit authorization behavior. See
+  [security policy consumption](security-policy.md) and the
+  [issue #13 delivery](tasks/vesryn-tool-runtime/P1-trusted-policy-consumption.md).

@@ -48,6 +48,12 @@ from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_too
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
 from .registry import compose, provider
 from .scope import DiscoveryScope
+from .security_policy import (
+    SecurityPolicyError,
+    SecurityPolicySnapshot,
+    admit_protected_asset,
+    decide_asset_admission,
+)
 from .shared_definitions import (
     SharedAssetDefinition,
     load_shared_definitions,
@@ -85,6 +91,8 @@ __all__ = [
     "GroupSummary",
     "Invocation",
     "NativeAssetDelivery",
+    "SecurityPolicyError",
+    "SecurityPolicySnapshot",
     "SharedAssetDefinition",
     "ToolAdapter",
     "ToolResult",
@@ -93,12 +101,14 @@ __all__ = [
     "ToolSpec",
     "UvLock",
     "UvToolBackend",
+    "admit_protected_asset",
     "asset_root",
     "canonical_binding",
     "checked_result",
     "compose",
     "compose_access_id",
     "create_binding",
+    "decide_asset_admission",
     "invoke_tool",
     "load_shared_definitions",
     "native_asset_directory",
