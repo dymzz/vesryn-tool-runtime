@@ -1,223 +1,101 @@
-# Discovery field contracts (single field authority)
+# ToolAsset / ToolGroup / ToolAccess field dictionary (issue #27, reopened)
 
-This is the public handoff for
-[issue #27](https://github.com/dymzz/vesryn-tool-runtime/issues/27)
-(TR-DISC-01A / 14-A, child of [#14](https://github.com/dymzz/vesryn-tool-runtime/issues/14)),
-baseline v0.3.0 (`3902efcb2154c82caf95c8d7d449f7268d68f6d1`).
-`src/vesryn_tool_runtime/discovery_contracts.py` is the **single canonical
-definition** of every field below; this document describes it and never
-redefines it. Later #14 tasks reuse these documents, enums, schemas and
-identity rules instead of copying them.
+Single field source for the three records. Every field below is the issue's
+field table entry verbatim; each maps to exactly one record field and one
+SQLite column, and the frozen DDL (`data/record_schema.sql`) plus the parity
+check refuse any drift. Later tasks consume these records — they do not
+restate, rename or shadow them.
 
-The module implements fields, thin validation and serialization only. It
-implements **no** group retrieval, alias scoring, ranking, entry selection,
-Scope decision or diagnosis algorithms, Binding management, permission
-verification, Provider loading, Dagger live discovery, installation or
-invocation. A field can *represent* a fact without that fact being verified:
-constructing any document here grants no permission and asserts no readiness,
-and field-layer validation passing is not evidence that any query or admission
-algorithm exists.
+## Physical layout: three logical entities, six tables
 
-## Public signatures
-
-```python
-from vesryn_tool_runtime import (
-    AccessEntrySummary,      # one logical access entry with separated facts
-    CandidateSummary,        # ToolSpec.summary()-derived candidate
-    ContractDetail,          # selected contract, schemas expanded only here
-    DiscoveryContractError,  # stable reason code, never a tool status
-    DiscoveryDiagnostic,     # structured query-layer fact
-    DiscoveryErrorDocument,  # query error shape, apart from ToolResult
-    DiscoveryPage,           # result envelope with paging/diagnostics
-    DiscoveryQuery,          # caller-side filter facts
-    GroupMember,             # capability reference inside a group
-    GroupSummary,            # disclosure-bounded group summary
-    compose_access_id,       # "<catalog_ref>:<tool_id>@<entry_key>"
-)
-CandidateSummary.from_spec(spec, *, provider, catalog_ref, environments=None,
-                           group_id=None, matched_alias=None, asset_id=None)
-X.document() -> dict        # canonical bounded JSON object
-X.from_document(value)      # strict parse; raises DiscoveryContractError(.code)
-```
-
-Enums and JSON Schemas are module constants (`EFFECTS`, `ASSEMBLY_STATES`,
-`BINDING_STATES`, `SCOPE_STATES`, `ADMISSION_STATES`, `AVAILABILITY_STATES`,
-`DIAGNOSTIC_CODES`, `ERROR_CODES`, `ITEM_KINDS`, `*_SCHEMA`) — import them from
-`vesryn_tool_runtime.discovery_contracts` rather than restating them.
-
-## Envelope, versioning and value rules
-
-Every document is `{"schema_version": 1, "kind": <kind>, …}` with `kind` one of
-`discovery-query`, `discovery-page`, `group-summary`, `candidate-summary`,
-`access-entry-summary`, `contract-detail`, `discovery-diagnostic`,
-`discovery-error`.
-
-- **Unknown fields are rejected** (JSON Schema `additionalProperties: false`
-  plus strict-key construction). There are no old callers today; a future field
-  set ships as a new `schema_version` with an explicit migration, never as a
-  silent addition.
-- **Null is never used.** Not-applicable facts are *omitted*; unknown facts are
-  *explicit enum values*. Empty lists occur only where "genuinely empty" is
-  meaningful (a result page with zero items); `aliases`, `diagnostics`,
-  `next_offset` and optional match facts are omitted when absent.
-- **Unknown never means success.** Defaults are the safe states:
-  `assembly="unknown"`, `binding="not_provided"`,
-  `execution_admission="not_evaluated"`, `availability="unknown"`.
-  `discovery_scope` has **no** default — a disclosure claim must be stated.
-- **No identity is generated here.** `discovery_id` only passes through a
-  caller-provided correlation string; documents carry no content-derived IDs.
-- Documents are finite bounded JSON; use the existing `documents` helpers for
-  canonical bytes/digests.
-
-## Identity decisions
-
-**`catalog_ref`** — a NAME (`^[a-z][a-z0-9-]*$`) the trusted host gives to one
-explicitly composed Catalog. Source: host naming its own inputs. Lifecycle:
-host-owned, stable for as long as the host keeps using that Catalog; resolution
-scope: only Catalogs the host explicitly supplies to a query. It names actual
-inputs — there is no global registry and no entry registration service.
-
-**`group_id`** — the `domain.group` tool-ID grammar (e.g. `python.quality`),
-unique within a `catalog_ref`. The same `group_id` with a different definition
-is a conflict (`conflicting_identity`); version, membership or alias changes
-never reassign it. Aliases never create capability identities.
-
-**`entry_key`** — a NAME the host gives to one logical entry of a capability
-within a Catalog (e.g. `default`, `dagger-native`). Source and lifecycle:
-host-owned and stable across version, contract-digest, binding, address,
-path and install-location changes — those live in separate fields.
-
-**`access_id`** — exactly `compose_access_id(catalog_ref, tool_id, entry_key)` =
-`"<catalog_ref>:<tool_id>@<entry_key>"` (e.g. `ci:python.dead-code@default`).
-Unique within a page/result set; duplicates are `conflicting_identity`. It is
-never derived from a parameterized `binding_id`, a query-generated ID, an
-Adapter object address, an absolute path or an install directory. Stability
-example: bumping `contract_version` or `interface_sha256` never changes
-`access_id`; renaming `entry_key` or `catalog_ref` is a host-decision identity
-change. When a host cannot supply these names, the entry stays **unreported**
-until it can — the field layer never guesses a mapping.
-
-## Field dictionary
-
-### DiscoveryQuery (`discovery-query`)
-
-| Field | Type | Presence | Domain / rule |
-| --- | --- | --- | --- |
-| `query` | str ≤256 | optional | Free filter words; no permission effect. |
-| `operation` | str ≤256 | optional | Operation keyword; matches existing `use_when`/`not_for` semantics. |
-| `domain`, `environment` | NAME | optional | Exact labels, as in existing search. |
-| `effect` | enum | optional | `read`/`check`/`write`. |
-| `group_id` | `domain.group` | optional | Only when querying within a group. |
-| `catalog_ref` | NAME | optional | Explicit catalog selection. |
-| `offset` | int ≥0 | required (default 0) | |
-| `limit` | int 1–50 | required (default 10) | Reuses the existing page bounds. |
-| `discovery_id` | str ≤256 | optional | Passthrough of a caller-provided correlation only. |
-
-### DiscoveryPage (`discovery-page`)
-
-| Field | Type | Presence | Domain / rule |
-| --- | --- | --- | --- |
-| `item_kind` | enum | required | `candidate-summary` / `group-summary` / `access-entry-summary`; items are homogeneous. |
-| `disclosure` | const | required | `summary`; details come from `ContractDetail`. |
-| `offset`, `limit` | as query | required | Envelope slice facts. |
-| `total` | int ≥0 | required | **Disclosable results only.** |
-| `next_offset` | int ≥0 | optional | Omitted when no next page; must equal `offset+len(items)` when more exist. |
-| `items` | list | required | Exactly `min(max(total−offset,0), limit)` items; unique identity per kind (`(catalog_ref, tool_id)` for candidates, `(catalog_ref, group_id)` for groups, `access_id` for entries); same `tool_id` under different `catalog_ref`s coexists. |
-| `query` | document | required | The query this page answers. |
-| `diagnostics` | list | optional | See below. |
-
-### GroupSummary (`group-summary`)
-
-| Field | Type | Presence | Domain / rule |
-| --- | --- | --- | --- |
-| `group_id`, `catalog_ref` | identity | required | See identity decisions. |
-| `members` | list ≥1 | required | `GroupMember{tool_id, catalog_ref}` references only — no contracts, Adapters or schemas copied. Unique within the group. |
-| `member_count` | int | required | Equals `len(members)`: only disclosable members appear, in list and count alike. |
-| `display_name` ≤120, `description` ≤4096 | str | optional | |
-| `aliases` | list of str ≤128, unique, ≤64 | optional | Match aids only; no new identity. |
-
-### CandidateSummary (`candidate-summary`)
-
-Every field of the existing `ToolSpec.summary()` — `tool_id`, optional
-`display_name` (≤120), `description` (≤240), `domain`, `effect`,
-`contract_version`, `contract_sha256` — plus:
-
-| Field | Type | Presence | Domain / rule |
-| --- | --- | --- | --- |
-| `provider` | NAME | required | Existing `Catalog.provider_for` identity. |
-| `catalog_ref` | NAME | required | Naming the actual input. |
-| `environments` | list of NAME ≥1 | required | Applicable environments from the spec. |
-| `group_id` | `domain.group` | conditional | Only when actually matched via that group path. |
-| `matched_alias` | str ≤128 | conditional | Only when actually matched via that alias. |
-| `asset_id` | token | conditional | Only when an asset is actually associated; pure-API capabilities have none. |
-
-`CandidateSummary.from_spec` derives the summary fields from `ToolSpec.summary()`
-itself — there is no second summary authority — and summaries never contain
-`input_schema`/`output_schema`/`source`.
-
-### AccessEntrySummary (`access-entry-summary`)
-
-| Field | Type | Presence | Domain / rule |
-| --- | --- | --- | --- |
-| `access_id` | composed | required | See identity decisions; auto-composed when omitted. |
-| `catalog_ref`, `tool_id`, `entry_key` | identity | required | Must compose to `access_id`. |
-| `provider` | NAME | required | |
-| `environment` | NAME | required | Actual execution environment. |
-| `purpose` | str ≤1024 | required | Bounded purpose summary. |
-| `contract_version`, `contract_sha256` | existing domains | required | Unchanged original semantics. |
-| `source` | object | optional | Exactly `ToolSpec.source`: `{kind, identity, interface_sha256}`. |
-| `discovery_scope` | `matched`/`excluded` | required | No default: a disclosure claim must be stated. Discoverability ≠ admission. |
-| `assembly` | enum | required (default `unknown`) | `assembled` / `missing` / `unknown` — Adapter fact only. |
-| `binding` | enum | required (default `not_provided`) | `not_provided`/`known_absent`/`pending_validation`/`valid`/`invalid`/`not_required`. |
-| `binding_id` | token | conditional | Required exactly when `binding∈{pending_validation, valid, invalid}`; forbidden otherwise. A binding ID is never an entry identity. |
-| `execution_admission` | enum | required (default `not_evaluated`) | `not_evaluated`/`admitted`/`rejected`; only an authority may state more. |
-| `availability` | enum | required (default `unknown`) | `unknown`/`available`/`unavailable`; health is never probed here. |
-| `reason_code` | diagnostic enum | conditional | Required exactly when `discovery_scope=excluded`, `execution_admission=rejected`, `binding=invalid` or `availability=unavailable`; forbidden otherwise. |
-
-There is deliberately **no** combined `ready`/`callable`/`allowed` flag.
-
-### ContractDetail (`contract-detail`)
-
-`access_id`/`catalog_ref`/`tool_id`/`entry_key` plus `contract`: exactly the
-existing `ToolSpec.document()` with `contract_sha256`, reconstructed through
-`ToolSpec` itself so the digest and schema stay single-sourced. Input/output
-schemas are expanded **only** at this level. A contract whose digest or
-`tool_id` does not match, or that carries unknown keys, is `invalid_document`.
-
-### DiscoveryDiagnostic / DiscoveryErrorDocument
-
-`DiscoveryDiagnostic{code, detail?, ref?}` with `code` from `DIAGNOSTIC_CODES`
-(`unregistered`, `undisclosed`, `scope_excluded`, `unassembled`,
-`binding_invalid`, `binding_unverified`, `unavailable`, `unknown_input`,
-`unknown`). `detail` (≤512) and `ref` (≤256) must never disclose hidden items —
-no identifiers, reasons, totals or member lists of anything absent from the
-same result; `ref` may only name an already-disclosed item.
-`DiscoveryErrorDocument{code, detail?}` with `code` from `ERROR_CODES`
-distinguishes query errors from `ToolResult` business statuses; raised
-field-contract failures carry the same codes on `DiscoveryContractError.code`.
-
-## Fact sources and permission boundaries
-
-| Fact | Authority | When absent |
+| 表 | 主键/约束 | 职责 |
 | --- | --- | --- |
-| Candidate/contract fields | the actual `ToolSpec` | not representable — no invention |
-| `provider` | `Catalog.provider_for` | required |
-| `assembly` | the host's registration knowledge | `unknown` |
-| `binding*` | an actual binding document supplied by the caller | `not_provided` |
-| `discovery_scope` | the host's disclosure decision | must be stated |
-| `execution_admission` | the existing Scope admission authority | `not_evaluated` |
-| `availability` | the execution/backend authority | `unknown` |
-| asset/selection facts | real `AssetSelection`/asset views | omitted |
-| trusted security decisions | #13's policy system (not `AssetPolicy.enabled`) | omitted |
+| `tool_asset` | `tool_id` PK | 工具身份、名称、来源、安装入口 |
+| `tool_release` | `(tool_id, version, platform)` 唯一 | 版本、平台、制品、摘要 |
+| `tool_group` | `group_id` PK | 组身份与整体摘要 |
+| `tool_group_member` | `(group_id, tool_id)` PK | 组内工具及专属 summary |
+| `tool_group_member_alias` | `(group_id, tool_id, alias)` PK | 成员专属别名 |
+| `tool_access` | `access_id` PK | 每个入口独立的 method、target、contract、summary |
 
-Filters, field constructors and schema reads never widen Scope or produce
-admission proof; `total` counts only disclosable results.
+`PRAGMA foreign_keys = ON` 强制:没有 `ToolAsset` 不能登记关联的
+`ToolAccess`/成员/发行物;一个工具可以关联多个不同入口;每个入口必须
+拥有独立的 `method`、`target`、`contract`;缺失必填字段直接失败。
 
-## Ownership for later #14 tasks
+## ToolAsset — 工具注册与资产来源
 
-This task uniquely owns `src/vesryn_tool_runtime/discovery_contracts.py`,
-`tests/test_discovery_contracts.py`, `docs/discovery-contracts.md`, the new
-exports in `__init__.py` and this documentation link. Later #14 sub-tasks
-(group retrieval, scope diagnostics, entry queries) own only their own new
-modules/tests/docs and reference this contract instead of copying it; changes
-to the shared fields go back through this task/#14 once.
+| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| --- | --- | --- | --- |
+| tool_id · 必填;全局工具主键,按登记值使用 | `ToolAsset.tool_id` | `tool_asset.tool_id` PK | 裸名或点式均按登记值;更名、版本、平台、分组及访问入口变化均不另生成工具身份 |
+| name · 必填;工具标准名称 | `.name` | `name` NOT NULL | 非空 |
+| provider · 必填;资产来源或准备方式 | `.provider` | `provider` CHECK | 公共定义列明:`uv`、`github-release`、`oci` |
+| package · 可缺省;Python 工具包名 | `.package` | `package` NULL | uv 场景缺省时可采用 name;存登记值,不隐式改写 |
+| versions · 必填;版本及对应资产子记录 | `.versions` | `tool_release` 行 | 子记录见下;同工具多版本多平台不分配新 tool_id |
+| entrypoint · 必填;安装后可执行程序名称 | `.entrypoint` | `entrypoint` NOT NULL | 非空 |
+
+### tool_release 子记录(versions 的每条资产)
+
+| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| --- | --- | --- | --- |
+| version · 必填;实际工具版本 | `ToolAssetVersion.version` | `version` NOT NULL | 非空 |
+| platform · 平台相关资产必填;明确的 OS/架构表示 | `.platform` | `platform_os`,`platform_arch` | 成对出现、成对非空;平台无关资产为 NULL;复用已有目标平台信息时按 os/arch 精确映射 |
+| source · 必填;下载 URL、包标识或 OCI 地址 | `.source` | `source` NOT NULL | 非空 |
+| digest_type · 必填;明确使用的摘要类型 | `.digest_type` | `digest_type` CHECK | 公共定义列明:`sha256` |
+| digest · 必填;对应制品的摘要 | `.digest` | `digest` CHECK | sha256 时 64 位十六进制 |
+
+本地安装记录通过 tool_id、版本、平台及摘要关联实际制品;本地路径不成为工具主键。
+
+## ToolGroup — Agent 的发现入口
+
+| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| --- | --- | --- | --- |
+| group_id · 必填;分组主键,支持原文示例 ci-security、ci-release | `ToolGroup.group_id` | `tool_group.group_id` PK | 按登记值 |
+| summary · 必填;整组能力摘要 | `.summary` | `summary` NOT NULL | 非空 |
+| members · 必填;该组的工具索引 | `.members` | `tool_group_member` 行 | 子记录见下 |
+
+### 成员子记录
+
+| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| --- | --- | --- | --- |
+| tool_id · 必填;关联 ToolAsset | `GroupMember.tool_id` | `tool_group_member.tool_id` FK | 外键强制存在 |
+| summary · 必填;该工具在本组中的用途 | `.summary` | `summary` NOT NULL | 组内专属;同一工具在不同组各持其文 |
+| aliases · 可为空;匹配别名、近义名称 | `.aliases` | `tool_group_member_alias.alias` | 成员专属表;**组级无别名列** |
+
+成员 summary、aliases 保留在成员记录中:同一个 trivy 在 ci-security 描述漏洞及配置扫描,在 ci-release 描述 SBOM 生成。
+
+## ToolAccess — 调用入口
+
+| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| --- | --- | --- | --- |
+| access_id · 必填;唯一入口标识,支持 trivy.scan、trivy.sbom、trivy.cli | `ToolAccess.access_id` | `tool_access.access_id` PK | **按登记值使用**,不强制拼接 catalog_ref、entry_key、本机路径或参数 |
+| tool_id · 必填;关联 ToolAsset | `.tool_id` | `tool_id` FK NOT NULL | 同一工具的多个入口使用同一 tool_id |
+| method · 必填;dagger、uv、native、api | `.method` | `method` CHECK | 公共定义列明四值 |
+| target · 必填;实际 Dagger Function、CLI 命令或 API 地址 | `.target` | `target` NOT NULL | 非空 |
+| contract · 必填;调用参数、输入输出契约 | `.contract` | `contract` JSON 对象 NOT NULL | 复用已有 ToolSpec 或 Dagger 原生接口描述;每入口独立,单一 ToolSpec 契约不替代多个入口 |
+| summary · 必填;入口执行什么操作 | `.summary` | `summary` NOT NULL | 非空 |
+
+provider 描述资产来源,method 描述调用入口:由 uv 准备的 CLI 可以通过
+Dagger 入口执行。工具身份、入口身份与契约内部身份之间只建立引用,
+不强制新 tool_id 等于旧 ToolSpec 能力 ID。**全库无 `asset_id` 列**:
+旧 asset_id 不成为与 tool_id 同义的第二个工具身份。
+
+## Serialization, queries and storage
+
+- `record_document(record)` / `record_from_document(document)`:严格往返
+  (字段集精确,未知键拒绝);文档即记录,无平行摘要类型。
+- `DiscoveryQuery` / `DiscoveryPage`:分页与过滤沿用既有界(limit 默认
+  10,范围 1–50);页内条目就是三类记录的文档;诊断与查询错误独立于
+  ToolResult 业务状态。
+- `open_record_store(path=None)`:`data/` 是库的家——默认打开
+  `data/records.sqlite3`;冻结 DDL 唯一权威在 `data/record_schema.sql`,
+  种子数据在 `data/seed.sql`;临时/缓存/产物属于 `.cache/`、`.tmp/`、
+  `.artifacts/`,不进 `data/`。
+
+## Migration boundary (explicit)
+
+- 旧能力 ID 与旧 asset_id 留在确有来源的旧契约/历史数据中,**不作为
+  新工具主键**;新公共对象一律 tool_id / group_id / access_id。
+- 旧格式读取/转换只存在于最外层的 `legacy_convert.py`,**临时代码**:
+  旧组文档可转换(catalog_ref 丢弃),旧入口摘要因缺 method/target 给出
+  明确「unsupported」结论;适配完成后该文件删除,记录层零兼容。
+- 后续任务(#32 登记 B、#33 资产 C、#34 入口 D、#35 发现 E)以本交付
+  为实施输入;发布过的任务文本不改写,冲突由其分支在本根上重建解决。

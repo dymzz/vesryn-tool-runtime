@@ -1,88 +1,85 @@
-# TR-DISC-01A — issue #27 delivery record
+# TR-DISC-01A — issue #27 delivery record (redo)
 
-Source: [issue #27](https://github.com/dymzz/vesryn-tool-runtime/issues/27), stage A of
-[issue #14](https://github.com/dymzz/vesryn-tool-runtime/issues/14). The issue's local
-task-book path does not exist in this checkout; this record is created from the fetched
-issue #27 body (same handling as the #6/#16/#18/#20 records).
+Source: [issue #27](https://github.com/dymzz/vesryn-tool-runtime/issues/27),
+reopened: the merged PR #28 did not satisfy the three record types and the
+issue was restored to incomplete ("合并实现仍未满足下述三类记录……由后续
+提交替换偏差,不改写已合并历史"). This record replaces the PR #28 delivery
+record for this task; merged history itself is not rewritten.
 
-Baseline: v0.3.0 main `3902efcb2154c82caf95c8d7d449f7268d68f6d1` (issue #12
-completed and released). No release is performed here; the package version
-stays 0.3.0.
+Baseline: main `adc1194`. Branch `zcode-27-record-foundation`, delivered in
+three owner-directed stages. Git identity: `zcode <zcode@local>` (the owner
+rejected the issue's suggested `codex` attribution; the redo is signed by the
+same identity that owns the earlier work).
 
-Handoff identity: [PR #28](https://github.com/dymzz/vesryn-tool-runtime/pull/28)
-(branch `codex/issue-27-discovery-field-contract`, rebased onto main `098bf4d`;
-the PR is the stable identity); submitted for review without merging.
+## What is delivered
 
-## Handoff
+**Stage 1 — six-table constrained SQLite foundation** (`a4d7485`):
+`data/record_schema.sql` (the frozen DDL, single authority), `data/seed.sql`
+(the issue's literal examples), `data/records.sqlite3` (the committed library
+built from both — `data/` is the database home; `open_record_store()` opens
+it by default); `discovery_records.py` (records only, zero I/O),
+`record_store.py` (per-record gateways over one connection,
+`PRAGMA foreign_keys=ON`). Constraints live in the tables: enum CHECKs
+(provider `uv|github-release|oci`, method `dagger|uv|native|api`, digest
+`sha256`), NOT NULL on every required field, `(tool_id, version, platform)`
+uniqueness, member PK `(group_id, tool_id)`, alias PK `(group_id, tool_id,
+alias)`, JSON-object contracts, digest shape checks — and **no `asset_id`
+column anywhere**.
 
-The single field authority is `src/vesryn_tool_runtime/discovery_contracts.py`,
-described field-by-field in
-[discovery field contracts](../../discovery-contracts.md). Public exports:
-`DiscoveryQuery`, `DiscoveryPage`, `GroupSummary`, `GroupMember`,
-`CandidateSummary`, `AccessEntrySummary`, `ContractDetail`,
-`DiscoveryDiagnostic`, `DiscoveryErrorDocument`, `DiscoveryContractError` and
-`compose_access_id`; enums and JSON Schemas are module constants.
+**Stage 2 — serialization and deviation replacement** (`9392a8a`):
+`record_document`/`record_from_document` strict round trips; the query layer
+(`DiscoveryQuery`/`DiscoveryPage`/diagnostics/errors) carries the records'
+own documents — the five PR #28 deviations are replaced: member records carry
+their own summary and aliases; entries carry method/target/their own
+contract; `compose_access_id` and the forced `catalog_ref:tool_id@entry_key`
+composition are deleted (access_id is used as registered); bare tool
+identities are valid tool primary keys; the entry contract is no longer
+forced equal to an old ToolSpec capability ID. Old-format handling exists
+only in `legacy_convert.py` — an explicitly **temporary outermost** module
+(only transition tests import it; deleted once adaptation completes) that
+converts old group documents (dropping `catalog_ref`) and returns an explicit
+`unsupported` conclusion for old access summaries, which lack method/target.
 
-Key decisions (full rationale in the doc):
+**Stage 3 — this record and the field dictionary**
+([discovery contracts](../../discovery-contracts.md)): every issue field
+mapped word-for-word to its record field and column, the six-table layout,
+identity rules and the migration boundary.
 
-- **Identity**: `catalog_ref`/`entry_key` are host-provided stable NAMEs for
-  explicitly supplied inputs; `group_id` uses the `domain.group` grammar unique
-  per catalog; `access_id` is exactly
-  `"<catalog_ref>:<tool_id>@<entry_key>"`, never derived from bindings,
-  addresses, paths or install locations, and stable across version/digest
-  changes. Missing mapping basis ⇒ the entry stays unreported; nothing is
-  guessed.
-- **Fact separation**: Adapter assembly (`assembled`/`missing`/`unknown`),
-  binding (`not_provided`/`known_absent`/`pending_validation`/`valid`/`invalid`/
-  `not_required`), discovery scope (`matched`/`excluded`, no default),
-  execution admission (`not_evaluated`/`admitted`/`rejected`) and availability
-  (`unknown`/`available`/`unavailable`) are distinct fields with structured
-  `reason_code` conditionals; no combined ready/callable flag exists, and no
-  default states a positive fact.
-- **Disclosure**: summaries never carry parameter schemas or copied contracts;
-  `ContractDetail` expands the existing `ToolSpec` document (digest verified
-  through `ToolSpec` itself) only at detail level; `total` counts disclosable
-  results only; diagnostics cannot name hidden items.
-- **Value rules**: strict `schema_version: 1` envelopes with unknown fields
-  rejected; null never used (omission vs explicit-unknown enums);
-  `discovery_id` is passthrough only; no content-derived identities at this
-  layer.
-- **Compatibility**: query paging reuses the existing bounds (limit 1–50,
-  default 10); candidate fields derive from `ToolSpec.summary()` itself;
-  `Catalog`'s duplicate-rejection invariant is untouched — multi-entry is
-  expressed via host-named `catalog_ref`/`entry_key`, with no new registry.
-
-## Directed acceptance
+## Acceptance mapping
 
 | Requirement | Result |
 | --- | --- |
-| Complete, verifiable field foundation as code with schemas, serialization and validation — not docs-only, placeholders or fixed examples | `discovery_contracts.py` (~950 lines) with 8 document types, 7 JSON Schemas, strict `document()`/`from_document()` round-trips and `DiscoveryContractError` codes; exercised by `tests/test_discovery_contracts.py`. |
-| All nine field domains covered with fixed semantics | Field dictionary in the doc, mirroring the code field-for-field; query/paging, groups, candidates, access entries, contract detail, assembly/binding/admission/availability facts, asset/policy references, results/diagnostics, versioning and unknown-value rules. |
-| The five common decisions resolved once | Identity/namespaces, multi-entry without Catalog changes, fact sources with permission boundaries, summary/detail separation, single field source — see the decisions above and the doc's sections. |
-| Only the field layer; no retrieval/ranking/admission/binding/health implementation | No such algorithm exists in the module; existing logic is referenced only for field semantics. |
+| 三类记录及 versions/members 子记录字段均有公共定义、序列化、校验;准确 Python 签名、字段类型、缺省规则及 JSON 示例 | `discovery_records.py` + `record_document`/`record_from_document`; dictionary doc lists each field's type and default; `data/seed.sql` is the JSON/SQL example set. |
+| 原文 trivy、ci-security、ci-release、trivy.scan、trivy.sbom、trivy.cli 完成往返;同一工具跨分组、版本、平台和入口保持同一 tool_id | Seeded in the committed library; `test_round_trip_with_the_issues_literal_examples` and `test_committed_library_round_trips_the_seeded_examples` read them back through the gateways. |
+| 两个分组中的成员用途摘要和别名保持各自内容;Access 的 method、target 和真实契约可以取得 | ci-security vs ci-release member records differ and stay per-group; three trivy entries each return their own method/target/contract. |
+| 重复主键冲突、无效外键及字段非法形态明确校验;不以额外目录身份替代全局工具身份 | Duplicate PK/FK/shape tests at both record and raw-SQL levels; the only identity is tool_id (no asset_id column; schema parity enforced). |
+| ToolSpec/Dagger 原生契约仍可准确引用,实际参数契约只有一个权威来源;旧能力身份与新工具身份不同的情况有明确迁移或映射依据 | `ToolAccess.contract` carries the ToolSpec/Dagger object per entry; the migration boundary (old capability IDs and asset_id stay in historical data; `legacy_convert` is temporary and outermost) is documented above. |
+| 明确现有资产、Binding/API 和消费者的受影响范围;定向验证,不冻结旧格式也不静默重解释 | Below. |
+| #14 回填提交/制品、公共接口、迁移说明、定向证据及后续模块边界 | This record; the dictionary doc's "后续任务" section names #32–#35 as consumers of this handoff. |
 
-Verified on 2026-10-24 with CPython 3.14.8 (this checkout's locked environment):
+## Impact scope (what is and is not affected)
+
+- **Replaced in this branch**: PR #28's public types
+  (`AccessEntrySummary`, `CandidateSummary`, `ContractDetail`,
+  `GroupSummary`, its `GroupMember`) and `compose_access_id` are gone from
+  `discovery_contracts.py` and the package exports. Existing
+  `ToolSpec`/`Catalog`/Binding/Scope semantics are untouched.
+- **Unmerged downstream branches** (PRs #36/#37 for issues #32/#33, PR #41
+  for #13) referenced the replaced types; per the issue they rebuild on this
+  root — their published texts are not rewritten here.
+- **Old data**: nothing on main persisted these documents outside tests and
+  examples, so no stored record is silently reinterpreted; the temporary
+  converter covers the only real old shapes (PR #28 test fixtures).
+
+## Verification (2026-10-24, CPython 3.14.8, locked env)
 
 | Evidence | Result |
 | --- | --- |
-| New field-contract tests | 15 passed. |
-| Full suite | 191 passed, 1 skipped — no regression. |
-| Lint / format | `ruff check` clean; `ruff format --check .` clean repo-wide. |
-| Packaging | the new module ships via the existing module-directory rule; no packaging change. |
+| Record foundation tests | 12 passed — round trips on the literal examples, duplicate PKs, FK refusals (record and raw-SQL), platform/digest/enum CHECKs, schema parity and drift refusal, frozen-`.sql` execution lock, committed-library read-back. |
+| Query-layer tests | 8 passed — paging bounds, envelope/unknown-field rejection, pages carrying record documents, off-page facts, diagnostics vs ToolResult, temporary-converter conclusions. |
+| Full suite | 198 passed, 1 skipped — no regression (the pre-existing #8 concurrency case still flakes only on this Windows host; isolated runs pass). |
+| Lint / format | `ruff check` clean; `ruff format --check` clean. |
 
-Local-environment observation (pre-existing, not this delivery's regression):
-the #8 concurrency case
-`tests/test_native_assets.py::test_two_concurrent_preparations_publish_once`
-flakes intermittently on this Windows host (with a pytest-cache `WinError 183`
-warning); verified to fail identically on the unchanged v0.3.0 baseline while
-this branch's changes were stashed. It is green in every CI run and belongs to
-another group's file, so it is left untouched.
-
-## Ownership for later #14 tasks
-
-This task uniquely owns `discovery_contracts.py`,
-`tests/test_discovery_contracts.py`, `docs/discovery-contracts.md` and the new
-exports. Later group-retrieval / scope-diagnostic / entry-query tasks own only
-their own modules, tests and docs, referencing this contract (imports, not
-copies). Shared-field changes go back through this task/#14 once — the split
-of those tasks happens after this handoff, per issue #27.
+Not delivered here (by boundary): group search/ranking, entry selection,
+install/download, execution scheduling, #15 event fields; no Vesryn/ECI/host
+changes; no release.
