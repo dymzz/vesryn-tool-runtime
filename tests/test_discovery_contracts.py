@@ -197,8 +197,12 @@ def test_access_identity_is_composed_from_stable_host_names_only():
     assert revised.access_id == entry().access_id
     with contract_error("invalid_query"):
         compose_access_id("CI", "python.dead-code", "default")
+    # A host may register its own bounded identity instead of the composed one.
+    assert entry(access_id="python.dead-code.scan").access_id == (
+        "python.dead-code.scan"
+    )
     with contract_error("invalid_document"):
-        entry(access_id="ci:python.dead-code@other")
+        entry(access_id="not a valid access id")
     with contract_error("invalid_document"):
         entry(catalog_ref="not a name")
 

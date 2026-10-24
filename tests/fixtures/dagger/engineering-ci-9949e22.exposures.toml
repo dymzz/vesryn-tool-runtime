@@ -1,0 +1,15 @@
+schema_version = 1
+module = "github.com/dymzz/engineering-ci@9949e22dc03e4361bb46540ca5a4d51c1cefd3ae"
+
+[resources]
+File = "dagger-id"
+Directory = "dagger-id"
+
+[[exposures]]
+id = "pytest.artifacts"
+object = "EngineeringCi"
+function = "repositoryTestArtifacts"
+effect = "check"
+recovery = "restartable"
+environments = ["container"]
+description = "Collect a repository's pytest artifacts through engineering-ci."

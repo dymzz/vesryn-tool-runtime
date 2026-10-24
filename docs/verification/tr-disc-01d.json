@@ -1,0 +1,61 @@
+{
+  "issue": 34,
+  "stage": "TR-DISC-01D / 14-D",
+  "checked": "2026-10-24",
+  "baseline": {
+    "branch": "codex/issue-32-unified-tool-registration",
+    "head": "e8967b1",
+    "package_version": "0.3.0",
+    "note": "working-tree delivery stacked on issue #32's branch; not a release"
+  },
+  "contract_source": {
+    "repository": "dymzz/engineering-ci",
+    "module": "github.com/dymzz/engineering-ci@9949e22dc03e4361bb46540ca5a4d51c1cefd3ae",
+    "branch": "codex/eci-056-trusted-policy",
+    "object": "EngineeringCi",
+    "function": "repositoryTestArtifacts",
+    "source_location": ".dagger/src/engineering_ci/main.py:122",
+    "dagger_version": "1.0.0-beta.16",
+    "introspection": "dagger --load-module <engineering-ci checkout> api query --doc <INTROSPECTION>",
+    "raw_bytes": 1500261,
+    "canonical_sha256": "b689d18247917a55ef7e214f14e2cc8864a4e16fc77cf431a4234717f4db4892",
+    "snapshot": "tests/fixtures/dagger/engineering-ci-9949e22.schema.json.gz",
+    "snapshot_sha256": "f0b3f845039f031e2c2d5a441d0724b24f38cc1e40a52900c515289fceaf3ed9",
+    "exposures": "tests/fixtures/dagger/engineering-ci-9949e22.exposures.toml",
+    "parsing_only": true
+  },
+  "mapped_contract": {
+    "tool_id": "pytest.artifacts",
+    "contract_sha256": "9386a8008c8d604b4630dc3550c26168456fa347be2d267db29dea1964690f19",
+    "interface_sha256": "ea37ff7b555f741ae8d576d40c6ceb54384121ad91548226108c27021576f2af",
+    "source_identity": "github.com/dymzz/engineering-ci@9949e22dc03e4361bb46540ca5a4d51c1cefd3ae#EngineeringCi.repositoryTestArtifacts",
+    "environments": ["container"],
+    "inputs": ["source"]
+  },
+  "access_entries_used": [
+    {
+      "access_id": "pytest.artifacts.default",
+      "form": "host-registered identity (no catalog_ref composition)",
+      "entry_key": "default"
+    },
+    {
+      "access_id": "ci:pytest.artifacts@native",
+      "form": "composed default form",
+      "entry_key": "native"
+    }
+  ],
+  "checks": {
+    "new_group": "tests/test_access_resolution.py: 14 passed",
+    "field_contracts": "tests/test_discovery_contracts.py: 15 passed (access-id relaxation covered)",
+    "full_suite": "210 passed, 1 skipped",
+    "lint": "ruff check src tests clean; ruff format --check src tests clean",
+    "no_side_effects": "resolution performed no subprocess (test patches subprocess.run to fail)"
+  },
+  "not_verified": [
+    "actual execution of the mapped engineering-ci function in a Dagger engine",
+    "binding creation/verification or execution admission for the entries",
+    "availability/health of any backend or container",
+    "engineering-ci #52/#53 consuming the new signatures",
+    "group discovery and alias ranking (#35)"
+  ]
+}

@@ -1,5 +1,6 @@
 """Public, independent registration, discovery, binding and invocation API."""
 
+from .access_resolution import AccessResolution, resolve_access, resolve_tool_access
 from .asset_index import (
     AssetFile,
     AssetIndex,
@@ -47,7 +48,7 @@ from .documents import ToolRuntimeError
 from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_tool
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
 from .registry import compose, provider
-from .scope import DiscoveryScope
+from .scope import DiscoveryScope, ScopeDecision
 from .shared_definitions import (
     SharedAssetDefinition,
     load_shared_definitions,
@@ -60,6 +61,7 @@ from .uv_assets import UvLock, UvToolBackend
 __all__ = [
     "SELECTION_BINDING",
     "AccessEntrySummary",
+    "AccessResolution",
     "Aria2NativeBackend",
     "Aria2Source",
     "AssetDefinition",
@@ -86,6 +88,7 @@ __all__ = [
     "GroupSummary",
     "Invocation",
     "NativeAssetDelivery",
+    "ScopeDecision",
     "SharedAssetDefinition",
     "ToolAdapter",
     "ToolAsset",
@@ -107,6 +110,8 @@ __all__ = [
     "native_asset_directory",
     "provider",
     "register_shared_definitions",
+    "resolve_access",
+    "resolve_tool_access",
     "shared_definition_documents",
     "verify_binding",
     "verify_document",

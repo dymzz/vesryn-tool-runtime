@@ -68,6 +68,9 @@ MAX_LIMIT = 50
 
 _TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,127}")
 _TOOL_PK = _TOKEN  # Tool primary keys accept bare names since #32.
+# A registered access identity: a host value (``trivy.scan``) or the composed
+# default (``ci:trivy@scan``), never a path, parameter or generated ID.
+_ACCESS = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+@:-]{0,255}")
 _NAME = re.compile(NAME["pattern"])
 _TOOL = re.compile(TOOL["pattern"])
 _HASH = re.compile(r"[0-9a-f]{64}")
@@ -137,11 +140,13 @@ def _integer(value, code, *, minimum, maximum=None):
 
 
 def compose_access_id(catalog_ref, tool_id, entry_key):
-    """The stable logical entry identity: ``<catalog_ref>:<tool_id>@<entry_key>``.
+    """The default logical entry identity: ``<catalog_ref>:<tool_id>@<entry_key>``.
 
     Composed only from host-provided stable names — never from binding
     parameters, query-generated IDs, object addresses or install locations —
-    and version/contract-digest changes never enter it.
+    and version/contract-digest changes never enter it. A host may instead
+    register its own bounded access identity (for example ``trivy.scan``):
+    composition is the fallback, not a required shape (#34).
     """
     _matches(catalog_ref, _NAME, "invalid_query")
     _matches(tool_id, _TOOL_PK, "invalid_query")
@@ -150,7 +155,7 @@ def compose_access_id(catalog_ref, tool_id, entry_key):
 
 
 def _entry_identity(entry, code):
-    """Validate the entry's naming parts and its composed access identity."""
+    """Validate the entry's naming parts and its registered access identity."""
     _matches(entry.catalog_ref, _NAME, code)
     _matches(entry.tool_id, _TOOL_PK, code)
     _matches(entry.entry_key, _NAME, code)
@@ -160,7 +165,7 @@ def _entry_identity(entry, code):
             "access_id",
             f"{entry.catalog_ref}:{entry.tool_id}@{entry.entry_key}",
         )
-    if entry.access_id != (f"{entry.catalog_ref}:{entry.tool_id}@{entry.entry_key}"):
+    elif not isinstance(entry.access_id, str) or not _ACCESS.fullmatch(entry.access_id):
         _fail(code)
 
 

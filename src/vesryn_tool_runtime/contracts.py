@@ -230,6 +230,22 @@ class Catalog:
             raise WorkflowError(f"Access entry is not registered: {access_id}")
         return self._accesses[access_id]
 
+    def has_tool(self, tool_id):
+        """Whether a primary key names a registered capability or asset record."""
+        return tool_id in self._known_tools()
+
+    def accesses_for(self, tool_id):
+        """Every registered access entry for one tool, in access-identity order.
+
+        A read of registration facts only: it filters nothing, discloses nothing
+        and never probes an adapter, backend or binding.
+        """
+        return tuple(
+            self._accesses[access_id]
+            for access_id in sorted(self._accesses)
+            if self._accesses[access_id].tool_id == tool_id
+        )
+
     def asset_for(self, tool_id, *, scope=None):
         """Read asset metadata by tool primary key; no acquisition is implied.
 
