@@ -14,7 +14,12 @@ publication is performed.
 ## Handoff
 
 - Branch: `dsh-34-tool-access-resolution` (issue-id naming), stacked on
-  `codex/issue-32-unified-tool-registration`.
+  `codex/issue-32-unified-tool-registration`; commit `882748a`,
+  [PR #38](https://github.com/dymzz/vesryn-tool-runtime/pull/38) against the #32
+  branch. The repository's CI workflow only runs for pull requests whose base is
+  `main`, so this stacked PR reports no checks; the full suite and lint were run
+  locally on the recorded head instead. CI runs again when #32 merges and GitHub
+  retargets this PR to `main`.
 - Commit: `codex` author and committer (per the issue's Git identity rule).
 - Files:
   - `src/vesryn_tool_runtime/access_resolution.py` — new resolution module
