@@ -8,7 +8,10 @@ Baseline: main `29b99dc` (v0.3.0 + #27 field contracts via PR #28 + #29 platform
 fixes via PR #31). Publisher contract: [ECI #56], merged as `c40fb69`, read
 only — its snapshot/decision builders (`src/engineering_ci/security_policy.py`)
 and contract docs were consulted to mirror shapes and codes exactly; no ECI
-code is imported. Git identity: `zcode <zcode@local>`.
+code is imported. Git identity: `zcode <zcode@local>`. Handoff identity: [PR
+#41](https://github.com/dymzz/vesryn-tool-runtime/pull/41) (branch
+`zcode-13-trusted-policy-consumption`, commit `856da29` plus this record
+update); submitted for review without merging.
 
 ## Handoff
 
