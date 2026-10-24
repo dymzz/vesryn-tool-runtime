@@ -1,9 +1,11 @@
 """SQLite storage for the three records: one gateway per record type.
 
-``open_record_store(path)`` owns the connection, creates the constrained
-schema from discovery_records.SCHEMA and refuses any column drift away from
-the issue's field tables. Each record type then has its own gateway over the
-shared connection — ``store.assets``, ``store.groups``, ``store.accesses`` —
+``open_record_store(path)`` opens (creating if needed) a database whose DDL
+must equal the frozen package schema exactly — constraints included, not just
+column names. The writable location is ALWAYS the caller's explicit choice
+(``":memory:"`` or a filesystem path); there is deliberately no default that
+could resolve into the Python installation directory. Each record type has
+its own gateway — ``store.assets``, ``store.groups``, ``store.accesses`` —
 with nothing in common but the foreign keys the schema itself enforces.
 """
 
@@ -22,7 +24,7 @@ from .discovery_records import (
     _name,
 )
 from .documents import canonical
-from .record_schema import SCHEMA_VERSION, TABLE_COLUMNS, schema_sql
+from .record_schema import SCHEMA_VERSION, TABLE_COLUMNS, schema_matches, schema_sql
 
 
 def _translate(error, duplicate_code):
@@ -39,7 +41,7 @@ def _translate(error, duplicate_code):
 
 
 class AssetTable:
-    """Writes and reads ToolAsset rows and their version sub-rows."""
+    """Writes and reads ToolAsset rows and their release sub-rows."""
 
     def __init__(self, db):
         self._db = db
@@ -63,14 +65,17 @@ class AssetTable:
                 )
                 self._db.executemany(
                     "INSERT INTO tool_release"
-                    " (tool_id, version, platform_os, platform_arch, source,"
-                    " digest_type, digest) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    " (tool_id, version, platform_os, platform_arch,"
+                    " platform_abi, platform_python, source, digest_type,"
+                    " digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [
                         (
                             asset.tool_id,
                             item.version,
                             item.platform.os if item.platform else None,
                             item.platform.arch if item.platform else None,
+                            item.platform.abi if item.platform else None,
+                            item.python,
                             item.source,
                             item.digest_type,
                             item.digest,
@@ -96,20 +101,23 @@ class AssetTable:
                 source,
                 digest_type,
                 digest,
-                Platform(os, arch) if os is not None else None,
+                Platform(os, arch, abi) if os is not None else None,
+                python,
             )
-            for version, os, arch, source, digest_type, digest in self._db.execute(
-                "SELECT version, platform_os, platform_arch, source,"
-                " digest_type, digest FROM tool_release WHERE tool_id = ?"
-                " ORDER BY rowid",
-                (tool_id,),
+            for version, os, arch, abi, python, source, digest_type, digest in (
+                self._db.execute(
+                    "SELECT version, platform_os, platform_arch, platform_abi,"
+                    " platform_python, source, digest_type, digest"
+                    " FROM tool_release WHERE tool_id = ? ORDER BY rowid",
+                    (tool_id,),
+                )
             )
         )
         return ToolAsset(row[0], row[1], row[2], versions, row[4], package=row[3])
 
 
 class GroupTable:
-    """Writes and reads ToolGroup rows and their member sub-rows."""
+    """Writes and reads ToolGroup rows, member rows and member aliases."""
 
     def __init__(self, db):
         self._db = db
@@ -225,7 +233,7 @@ class AccessTable:
 
 
 class RecordStore:
-    """A connection to the constrained schema with per-record gateways."""
+    """A connection to the frozen schema with per-record gateways."""
 
     def __init__(self, db):
         self._db = db
@@ -237,33 +245,23 @@ class RecordStore:
         self._db.close()
 
 
-RECORDS_DATABASE = "records.sqlite3"
+def open_record_store(path):
+    """Open a store at the caller's explicit path, or an in-memory one.
 
-
-def default_database():
-    """Databases live in data/: the default is the committed library there."""
-    return Path(__file__).resolve().parents[2] / "data" / RECORDS_DATABASE
-
-
-def open_record_store(path=None):
-    """Open a store whose tables match the field tables.
-
-    Without a path this opens ``data/records.sqlite3`` — databases are stored
-    under ``data/``; temporary scratch work belongs in temp directories, not
-    the database home.
+    ``path`` is ``":memory:"`` or a filesystem location chosen by the caller;
+    a brand-new database is created from the frozen package schema, and any
+    existing database must carry the exact frozen DDL (constraints included)
+    and schema version — same-columns-but-no-constraints databases are
+    refused as ``schema_drift``.
     """
-    if path is None:
-        target = default_database()
-    elif isinstance(path, (str, Path)) and str(path) == ":memory:":
-        target = None
+    if isinstance(path, (str, Path)) and str(path) == ":memory:":
         location = ":memory:"
     elif isinstance(path, (str, Path)):
         target = Path(path)
-    else:
-        raise RecordError("invalid_store")
-    if target is not None:
         target.parent.mkdir(parents=True, exist_ok=True)
         location = str(target)
+    else:
+        raise RecordError("invalid_store")
     db = sqlite3.connect(location)
     try:
         db.execute("PRAGMA foreign_keys = ON")
@@ -277,6 +275,8 @@ def open_record_store(path=None):
             actual = tuple(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
             if actual != columns:
                 raise RecordError("schema_drift")
+        if not schema_matches(db):
+            raise RecordError("schema_drift")
     except BaseException:
         db.close()
         raise

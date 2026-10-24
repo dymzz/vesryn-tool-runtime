@@ -1,5 +1,7 @@
 """Query documents over the three records: paging, grammar, round trips."""
 
+from pathlib import Path
+
 import pytest
 
 from vesryn_tool_runtime import (
@@ -19,9 +21,12 @@ def contract_error(code):
     return pytest.raises(DiscoveryContractError, match=code)
 
 
+COMMITTED_LIBRARY = Path(__file__).resolve().parents[1] / "data" / ("records.sqlite3")
+
+
 @pytest.fixture
 def library():
-    handle = open_record_store()
+    handle = open_record_store(COMMITTED_LIBRARY)
     yield handle
     handle.close()
 
@@ -161,30 +166,18 @@ def test_diagnostics_and_errors_are_not_business_results():
         DiscoveryErrorDocument("not-a-code")
 
 
-def test_legacy_conversion_happens_only_at_the_outermost_layer():
-    """The temporary converter produces explicit conclusions: group members
-    convert (catalog_ref dropped), access summaries cannot — no method or
-    target. It is deleted once adaptation completes; nothing else imports
-    it."""
-    from vesryn_tool_runtime import legacy_convert
+def test_old_formats_are_explicitly_unsupported():
+    """No compatibility layer exists: the PR #28-era documents lack the
+    fields the record tables require (members without group-local summary,
+    accesses without method/target), so conversion is not offered at all —
+    the documented conclusion is unsupported, with no fabricated content."""
+    import vesryn_tool_runtime
 
-    old_group = {
-        "group_id": "ci-security",
-        "summary": "Security gates",
-        "members": [{"tool_id": "trivy", "catalog_ref": "ci"}],
-    }
-    converted = legacy_convert.convert_legacy_group(old_group)
-    assert converted is not None
-    assert converted.members[0].tool_id == "trivy"
-    assert converted.members[0].aliases == ()
+    assert not hasattr(vesryn_tool_runtime, "legacy_convert")
+    import importlib
 
-    old_access = {
-        "access_id": "ci:python.dead-code@default",
-        "tool_id": "python.dead-code",
-        "contract_version": "1",
-        "contract_sha256": "0" * 64,
-    }
-    assert (
-        legacy_convert.convert_legacy_access(old_access)
-        == legacy_convert.LEGACY_UNSUPPORTED
+    pytest.raises(
+        ModuleNotFoundError,
+        importlib.import_module,
+        "vesryn_tool_runtime.legacy_convert",
     )

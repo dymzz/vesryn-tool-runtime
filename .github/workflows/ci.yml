@@ -38,6 +38,32 @@ jobs:
           unset GH_TOKEN
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/direct_tool.py
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I -c 'import importlib.util as u; assert u.find_spec("vesryn") is None and u.find_spec("engineering_ci") is None'
+          "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I - <<'PY'
+          # The frozen schema and seed ship as package resources and the
+          # store entry works from the installed wheel alone (issue #27).
+          from vesryn_tool_runtime.discovery_records import (
+              Platform, ToolAsset, ToolAssetVersion,
+          )
+          from vesryn_tool_runtime.record_schema import SCHEMA_VERSION, seed_sql
+          from vesryn_tool_runtime.record_store import open_record_store
+
+          assert "vulture" in seed_sql()
+          store = open_record_store(":memory:")
+          store.assets.put(
+              ToolAsset(
+                  "probe", "probe", "uv",
+                  (ToolAssetVersion(
+                      "1", "https://example.invalid/p.whl", "sha256", "0" * 64,
+                      Platform("linux", "x86_64", "gnu"), ">=3.10",
+                  ),),
+                  "probe",
+              )
+          )
+          release = store.assets.get("probe").versions[0]
+          assert (release.platform.abi, release.python) == ("gnu", ">=3.10")
+          store.close()
+          assert SCHEMA_VERSION == 2
+          PY
       - name: Verify combined shared definitions offline
         run: |
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/shared_definitions.py

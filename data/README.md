@@ -1,14 +1,13 @@
 # Data directory
 
-The data home for the record store (issue #27):
+The repository's database home for the record store (issue #27):
 
-- `record_schema.sql` — the frozen DDL: the single authority for the
-  six-table layout (three logical entities). Code loads it verbatim; no
-  copy exists elsewhere.
-- `seed.sql` — the issue's literal example records as INSERT data.
-- `records.sqlite3` — the SQLite library built from the frozen schema and
-  the seed data; `open_record_store()` opens it by default, and databases
-  opened for writing live here too.
+- `records.sqlite3` — the demo library built from the frozen package schema
+  and seed; tests open it by explicit path.
 
-Temp scratch, caches and build junk never come here — those belong to
-`.cache/`, `.tmp/` and `.artifacts/`.
+The frozen DDL and the seed records ship INSIDE the package as resources
+(`vesryn_tool_runtime/record_schema.sql`, `record_seed.sql`), read through
+`importlib.resources`, so independent installs need no source checkout.
+Writable database locations are always supplied explicitly by the caller —
+nothing resolves a default from the install directory. Temp scratch, caches
+and build junk belong to `.cache/`, `.tmp/` and `.artifacts/`, never here.

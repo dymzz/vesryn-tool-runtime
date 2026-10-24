@@ -83,3 +83,44 @@ identity rules and the migration boundary.
 Not delivered here (by boundary): group search/ranking, entry selection,
 install/download, execution scheduling, #15 event fields; no Vesryn/ECI/host
 changes; no release.
+
+## 2026-10-24 review fixes (second commit series)
+
+Six review findings, fixed in order on this same branch:
+
+1. **P1 — packaging**: the frozen DDL and seed now ship as **package
+   resources** (`vesryn_tool_runtime/record_schema.sql`,
+   `record_seed.sql`) read via `importlib.resources`; verified from the
+   built wheel and sdist by extracting and importing with no source
+   checkout (`open_record_store(":memory:")` + seed read + a full
+   put/get), and the CI installed-wheel step now exercises this entry.
+   No absolute paths, no checkout requirement.
+2. **P1 — writable location**: `open_record_store(path)` requires an
+   explicit path; the default that resolved into the Python installation
+   directory is deleted. Writable stores live where the caller puts them
+   (the repo demo library stays at `data/records.sqlite3`, opened by
+   explicit path).
+3. **P2 — schema authority**: primary-key columns are NOT NULL (three
+   NULL-PK inserts now rejected), `tool_group_member_alias` carries a
+   composite foreign key to the membership (aliases cannot outlive or
+   bypass their member; deletion cascades), sha256 digests must be
+   lowercase hex (`'g'×64` rejected at both record and SQL level), and
+   the drift check now compares the **full DDL** (`sqlite_master` vs the
+   frozen file, whitespace-normalized) — a same-columns/no-constraints
+   database is refused as `schema_drift`.
+4. **P2 — release semantics**: `Platform` gains `abi` and the version
+   record gains `python` (interpreter requirement, independent of
+   platform presence); uniqueness covers platform+abi+python, so deptry's
+   abi `gnu`/`>=3.10` release is representable and a same-version musl
+   build coexists instead of conflicting. The seed demonstrates a
+   universal wheel (`vulture`, no platform, `>=3.9`).
+5. **P2 — page typing**: `DiscoveryPage` validates every record's actual
+   type against `record_kind`; a tool-group page carrying a ToolAccess
+   document is rejected.
+6. **P2 — legacy honesty**: the temporary converter and its fabricated
+   test inputs are deleted; the documented conclusion is that PR #28-era
+   documents **cannot convert** (members lack group-local summary/aliases,
+   accesses lack method/target) and no compatibility layer is delivered.
+
+Schema version bumped to 2; `data/records.sqlite3` rebuilt from the new
+frozen schema and seed.

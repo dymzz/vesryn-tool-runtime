@@ -14,6 +14,7 @@ identity, and a local install path never becomes one. Registration states a
 fact about tooling — not installation, authorization or execution.
 """
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -46,35 +47,59 @@ def _enum(value, values, code):
 
 @dataclass(frozen=True)
 class Platform:
-    """The explicit os/arch representation of a platform-specific asset."""
+    """The explicit platform of a platform-specific asset.
+
+    ``os``/``arch`` are the machine facts; ``abi`` is the C-library/ABI
+    constraint (e.g. ``gnu``, ``musl``) and ``python`` the interpreter
+    requirement string (e.g. ``>=3.10``) a release actually carries — real
+    artifacts state these (deptry's manylinux wheel is abi ``gnu`` with
+    ``>=3.10``), and same-version releases that differ only in ABI or
+    interpreter range are distinct records, not conflicts.
+    """
 
     os: str
     arch: str
+    abi: str | None = None
+    python: str | None = None
 
     def __post_init__(self):
         _name(self.os, "invalid_record", 64)
         _name(self.arch, "invalid_record", 64)
+        if self.abi is not None:
+            _name(self.abi, "invalid_record", 64)
 
 
 @dataclass(frozen=True)
 class ToolAssetVersion:
-    """One versioned artifact of a tool: never a new tool identity."""
+    """One versioned artifact of a tool: never a new tool identity.
+
+    ``platform`` carries the machine constraint (os/arch/abi) when the
+    artifact is platform-built; ``python`` carries the interpreter
+    requirement string (e.g. ``>=3.10``) independently — a universal wheel
+    has no platform but a real interpreter constraint (vulture: no platform,
+    ``>=3.9``; deptry: linux/x86_64 with abi ``gnu`` and ``>=3.10``).
+    """
 
     version: str
     source: str
     digest_type: str
     digest: str
     platform: Platform | None = None
+    python: str | None = None
 
     def __post_init__(self):
         _name(self.version, "invalid_record", 128)
         _name(self.source, "invalid_record", 2048)
         _enum(self.digest_type, DIGEST_TYPES, "invalid_record")
         _name(self.digest, "invalid_record", 256)
-        if self.digest_type == "sha256" and len(self.digest) != 64:
+        if self.digest_type == "sha256" and not re.fullmatch(
+            r"[0-9a-f]{64}", self.digest
+        ):
             raise RecordError("invalid_record")
         if self.platform is not None and not isinstance(self.platform, Platform):
             raise RecordError("invalid_record")
+        if self.python is not None:
+            _name(self.python, "invalid_record", 64)
 
 
 @dataclass(frozen=True)
@@ -99,7 +124,12 @@ class ToolAsset:
         ):
             raise RecordError("invalid_record")
         identities = {
-            (item.version, item.platform or ("", "")) for item in self.versions
+            (
+                item.version,
+                item.platform or ("", "", ""),
+                item.python or "",
+            )
+            for item in self.versions
         }
         if len(identities) != len(self.versions):
             raise RecordError("duplicate_version")
@@ -191,12 +221,18 @@ def _document_platform(value):
     if value is None:
         return None
     value = _document_mapping(value)
-    _require(set(value) == {"os", "arch"})
-    return Platform(value["os"], value["arch"])
+    _require(set(value) <= {"os", "arch", "abi"})
+    _require({"os", "arch"} <= set(value))
+    return Platform(value["os"], value["arch"], value.get("abi"))
 
 
 def platform_document(platform):
-    return None if platform is None else {"os": platform.os, "arch": platform.arch}
+    if platform is None:
+        return None
+    value = {"os": platform.os, "arch": platform.arch}
+    if platform.abi is not None:
+        value["abi"] = platform.abi
+    return value
 
 
 class _RecordDocument:
@@ -211,24 +247,32 @@ class _RecordDocument:
 
 
 def _asset_version_document(item):
-    return {
+    value = {
         "version": item.version,
         "platform": platform_document(item.platform),
         "source": item.source,
         "digest_type": item.digest_type,
         "digest": item.digest,
     }
+    if item.python is not None:
+        value["python"] = item.python
+    return value
 
 
 def _asset_version_from_document(value):
     value = _document_mapping(value)
-    _require(set(value) == {"version", "platform", "source", "digest_type", "digest"})
+    _require(
+        set(value)
+        <= {"version", "platform", "source", "digest_type", "digest", "python"}
+    )
+    _require({"version", "platform", "source", "digest_type", "digest"} <= set(value))
     return ToolAssetVersion(
         value["version"],
         value["source"],
         value["digest_type"],
         value["digest"],
         _document_platform(value["platform"]),
+        value.get("python"),
     )
 
 

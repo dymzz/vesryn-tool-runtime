@@ -1,27 +1,28 @@
-"""The frozen record schema: six physical tables for three logical entities.
+"""The frozen record schema and seed, shipped and read as package resources.
 
-The DDL lives in ``data/record_schema.sql`` — that committed file alone is
-the frozen authority for the storage layout (issue #27, reopened;
-owner-directed structure). This module pins its version and column lists and
-loads the SQL verbatim; the parity check in record_store then refuses any
-database whose tables drift from it. ``data/`` is the database home:
-the frozen schema, the seed data and the SQLite libraries live there.
+``record_schema.sql`` beside this module is the single frozen authority for
+the six-table layout (issue #27 reopened; owner-directed structure) and ships
+inside the wheel — it is read through ``importlib.resources`` and works from
+an independent installation, with no source checkout and no absolute paths.
+``record_seed.sql`` carries the issue's literal example records the same way.
+Writable databases are NOT package data: their location is always supplied
+explicitly by the caller (the repository keeps its demo library under
+``data/``); nothing here resolves a default writable path from the install
+location.
+
+The parity contract goes beyond column names: ``expected_schema()`` is the
+full DDL text (tables and the release-identity index) the frozen file
+creates, and a database is accepted only if its own ``sqlite_master`` DDL
+matches it — a same-columns/no-constraints database is refused as drift.
 """
 
-from pathlib import Path
+import sqlite3
+from importlib.resources import files as resource_files
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
-SCHEMA_PATH = Path(__file__).resolve().parents[2] / "data" / "record_schema.sql"
-
-
-def schema_sql():
-    """The frozen DDL, read verbatim from data/record_schema.sql."""
-    try:
-        return SCHEMA_PATH.read_text(encoding="utf-8")
-    except OSError:
-        raise RuntimeError(f"Frozen schema file is missing: {SCHEMA_PATH}") from None
-
+SCHEMA_RESOURCE = "record_schema.sql"
+SEED_RESOURCE = "record_seed.sql"
 
 TABLE_COLUMNS = {
     "tool_asset": ("tool_id", "name", "provider", "package", "entrypoint"),
@@ -30,6 +31,8 @@ TABLE_COLUMNS = {
         "version",
         "platform_os",
         "platform_arch",
+        "platform_abi",
+        "platform_python",
         "source",
         "digest_type",
         "digest",
@@ -46,3 +49,46 @@ TABLE_COLUMNS = {
         "summary",
     ),
 }
+
+
+def _resource(name):
+    return resource_files(__package__).joinpath(name).read_text(encoding="utf-8")
+
+
+def schema_sql():
+    """The frozen DDL, read from the package resource."""
+    return _resource(SCHEMA_RESOURCE)
+
+
+def seed_sql():
+    """The example records, read from the package resource."""
+    return _resource(SEED_RESOURCE)
+
+
+def _normalized(sql):
+    return " ".join(sql.split())
+
+
+def expected_schema():
+    """name → normalized DDL for every table and index the frozen file makes."""
+    db = sqlite3.connect(":memory:")
+    try:
+        db.executescript(schema_sql())
+        rows = db.execute(
+            "SELECT name, sql FROM sqlite_master"
+            " WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+        return {name: _normalized(sql) for name, sql in rows}
+    finally:
+        db.close()
+
+
+def schema_matches(db):
+    """True when the database's own DDL equals the frozen schema's DDL."""
+    expected = expected_schema()
+    rows = db.execute(
+        "SELECT name, sql FROM sqlite_master"
+        " WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
+    ).fetchall()
+    actual = {name: _normalized(sql) for name, sql in rows}
+    return actual == expected

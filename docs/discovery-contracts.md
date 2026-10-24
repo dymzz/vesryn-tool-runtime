@@ -11,7 +11,7 @@ restate, rename or shadow them.
 | 表 | 主键/约束 | 职责 |
 | --- | --- | --- |
 | `tool_asset` | `tool_id` PK | 工具身份、名称、来源、安装入口 |
-| `tool_release` | `(tool_id, version, platform)` 唯一 | 版本、平台、制品、摘要 |
+| `tool_release` | `(tool_id, version, platform, python)` 唯一 | 版本、平台(含 ABI)、解释器约束、制品、摘要 |
 | `tool_group` | `group_id` PK | 组身份与整体摘要 |
 | `tool_group_member` | `(group_id, tool_id)` PK | 组内工具及专属 summary |
 | `tool_group_member_alias` | `(group_id, tool_id, alias)` PK | 成员专属别名 |
@@ -37,7 +37,8 @@ restate, rename or shadow them.
 | 字段(issue 原文) | 记录字段 | 列 | 规则 |
 | --- | --- | --- | --- |
 | version · 必填;实际工具版本 | `ToolAssetVersion.version` | `version` NOT NULL | 非空 |
-| platform · 平台相关资产必填;明确的 OS/架构表示 | `.platform` | `platform_os`,`platform_arch` | 成对出现、成对非空;平台无关资产为 NULL;复用已有目标平台信息时按 os/arch 精确映射 |
+| platform · 平台相关资产必填;明确的 OS/架构表示 | `.platform` | `platform_os`,`platform_arch`,`platform_abi` | 成对出现、成对非空;`abi` 为该制品的 C 库/ABI 约束(deptry 的 manylinux wheel 是 `gnu`,musl 制品是 `musl`),同版本同 os/arch 不同 ABI 是不同记录;平台无关资产为 NULL |
+| (版本级)解释器约束 | `.python` | `platform_python` | 解释器要求串(如 `>=3.10`),与平台无关地存在于版本记录上——通用 wheel 无平台但有真实约束(deptry `>=3.10`,vulture 通用 wheel `>=3.9`)|
 | source · 必填;下载 URL、包标识或 OCI 地址 | `.source` | `source` NOT NULL | 非空 |
 | digest_type · 必填;明确使用的摘要类型 | `.digest_type` | `digest_type` CHECK | 公共定义列明:`sha256` |
 | digest · 必填;对应制品的摘要 | `.digest` | `digest` CHECK | sha256 时 64 位十六进制 |
@@ -85,17 +86,19 @@ Dagger 入口执行。工具身份、入口身份与契约内部身份之间只�
 - `DiscoveryQuery` / `DiscoveryPage`:分页与过滤沿用既有界(limit 默认
   10,范围 1–50);页内条目就是三类记录的文档;诊断与查询错误独立于
   ToolResult 业务状态。
-- `open_record_store(path=None)`:`data/` 是库的家——默认打开
-  `data/records.sqlite3`;冻结 DDL 唯一权威在 `data/record_schema.sql`,
-  种子数据在 `data/seed.sql`;临时/缓存/产物属于 `.cache/`、`.tmp/`、
+- `open_record_store(path)`:路径必填(`":memory:" 或调用者显式选择的
+  文件位置)——不存在从安装目录推导的默认可写位置;冻结 DDL 与种子
+  作为**包资源**交付(`record_schema.sql`、`record_seed.sql`,经
+  `importlib.resources` 读取),独立安装即可用;仓库演示库在
+  `data/records.sqlite3`;临时/缓存/产物属于 `.cache/`、`.tmp/`、
   `.artifacts/`,不进 `data/`。
 
 ## Migration boundary (explicit)
 
 - 旧能力 ID 与旧 asset_id 留在确有来源的旧契约/历史数据中,**不作为
   新工具主键**;新公共对象一律 tool_id / group_id / access_id。
-- 旧格式读取/转换只存在于最外层的 `legacy_convert.py`,**临时代码**:
-  旧组文档可转换(catalog_ref 丢弃),旧入口摘要因缺 method/target 给出
-  明确「unsupported」结论;适配完成后该文件删除,记录层零兼容。
+- 旧格式**不支持转换,且不提供任何兼容层**:PR #28 时代的组成员无组内
+  summary/aliases、入口摘要无 method/target,缺失字段无法补造,结论为
+  明确的 unsupported;不交付迁移代码,不虚构占位内容。
 - 后续任务(#32 登记 B、#33 资产 C、#34 入口 D、#35 发现 E)以本交付
   为实施输入;发布过的任务文本不改写,冲突由其分支在本根上重建解决。

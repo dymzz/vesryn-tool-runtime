@@ -9,6 +9,7 @@ a missing required field fails on insert.
 """
 
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -21,7 +22,12 @@ from vesryn_tool_runtime.discovery_records import (
     ToolAssetVersion,
     ToolGroup,
 )
-from vesryn_tool_runtime.record_schema import TABLE_COLUMNS
+from vesryn_tool_runtime.record_schema import (
+    SCHEMA_RESOURCE,
+    SEED_RESOURCE,
+    TABLE_COLUMNS,
+    schema_sql,
+)
 from vesryn_tool_runtime.record_store import open_record_store
 
 TRIVY_LINUX = ToolAssetVersion(
@@ -175,7 +181,7 @@ def test_foreign_key_rules_enforced_by_the_schema(store):
     with pytest.raises(sqlite3.IntegrityError):
         db.execute(
             "INSERT INTO tool_release VALUES"
-            " ('absent','1','linux','x86_64','https://e.invalid/a','sha256','"
+            " ('absent','1','linux','x86_64',NULL,NULL,'https://e.invalid/a','sha256','"
             + "0" * 64
             + "')"
         )
@@ -211,6 +217,8 @@ def test_record_level_validation_rejects_off_table_fields():
         ToolAssetVersion("1", "https://e.invalid/a", "md5", "0" * 64)
     with pytest.raises(RecordError, match="invalid_record"):
         ToolAssetVersion("1", "https://e.invalid/a", "sha256", "short")
+    with pytest.raises(RecordError, match="invalid_record"):
+        ToolAssetVersion("1", "https://e.invalid/a", "sha256", "g" * 64)
     with pytest.raises(RecordError, match="invalid_record"):
         Platform("linux", "")
     with pytest.raises(RecordError, match="invalid_record"):
@@ -283,23 +291,23 @@ def test_the_tables_themselves_enforce_the_field_constraints():
         "INSERT INTO tool_asset VALUES ('trivy','other','uv',NULL,'other')",
         "INSERT INTO tool_asset VALUES ('t4','t4','uv',NULL,NULL)",
         "INSERT INTO tool_release VALUES"
-        " ('trivy','0.1','linux',NULL,'https://e.invalid/a','sha256','"
+        " ('trivy','0.1','linux',NULL,NULL,NULL,'https://e.invalid/a','sha256','"
         + "0" * 64
         + "')",
         "INSERT INTO tool_release VALUES"
-        " ('trivy','0.1',NULL,'x86_64','https://e.invalid/a','sha256','"
+        " ('trivy','0.1',NULL,'x86_64',NULL,NULL,'https://e.invalid/a','sha256','"
         + "0" * 64
         + "')",
         (
             "INSERT INTO tool_release VALUES"
-            " ('trivy','0.1','linux','x86_64','https://e.invalid/a','sha256','tiny')"
+            " ('trivy','0.1','linux','x86_64',NULL,NULL,'https://e.invalid/a','sha256','tiny')"
         ),
         "INSERT INTO tool_release VALUES"
-        " ('trivy','0.1','linux','x86_64','https://e.invalid/a','sha512','"
+        " ('trivy','0.1','linux','x86_64',NULL,NULL,'https://e.invalid/a','sha512','"
         + "0" * 64
         + "')",
         "INSERT INTO tool_release VALUES"
-        " ('absent','0.1','linux','x86_64','https://e.invalid/a','sha256','"
+        " ('absent','0.1','linux','x86_64',NULL,NULL,'https://e.invalid/a','sha256','"
         + "0" * 64
         + "')",
         "INSERT INTO tool_group_member VALUES ('no-group','trivy','s')",
@@ -350,7 +358,7 @@ def test_same_version_two_platforms_is_not_a_conflict(store):
     with pytest.raises(sqlite3.IntegrityError):
         db.execute(
             "INSERT INTO tool_release VALUES"
-            " ('osv-scanner','2.6.0','linux','x86_64','https://other','sha256','"
+            " ('osv-scanner','2.6.0','linux','x86_64',NULL,NULL,'https://other','sha256','"
             + "c" * 64
             + "')"
         )
@@ -377,6 +385,61 @@ def test_persistence_across_reopen(tmp_path):
         open_record_store(path)
 
 
+def test_platform_and_interpreter_constraints_are_real_fields():
+    """deptry-shaped releases keep abi and interpreter constraints; same
+    version and os/arch with a different ABI coexist instead of colliding."""
+    handle = open_record_store(":memory:")
+    gnu = ToolAssetVersion(
+        "0.25.1",
+        "https://e.invalid/deptry-gnu.whl",
+        "sha256",
+        "a" * 64,
+        Platform("linux", "x86_64", "gnu"),
+        ">=3.10",
+    )
+    musl = ToolAssetVersion(
+        "0.25.1",
+        "https://e.invalid/deptry-musl.whl",
+        "sha256",
+        "b" * 64,
+        Platform("linux", "x86_64", "musl"),
+        ">=3.10",
+    )
+    universal = ToolAssetVersion(
+        "2.16",
+        "https://e.invalid/vulture.whl",
+        "sha256",
+        "6e0f1c312cef1c87856957e5c2ca9608834a7c794c2180477f30bf0e4cc58eee",
+        None,
+        ">=3.9",
+    )
+    handle.assets.put(
+        ToolAsset("deptry", "deptry", "uv", (gnu, musl), "deptry", package="deptry")
+    )
+    back = handle.assets.get("deptry")
+    assert [(i.platform.abi, i.python) for i in back.versions] == [
+        ("gnu", ">=3.10"),
+        ("musl", ">=3.10"),
+    ]
+    handle.assets.put(ToolAsset("vulture", "vulture", "uv", (universal,), "vulture"))
+    wheel = handle.assets.get("vulture").versions[0]
+    assert wheel.platform is None and wheel.python == ">=3.9"
+    assert record_document_of_universal(wheel)
+    handle.close()
+
+
+def record_document_of_universal(wheel):
+    from vesryn_tool_runtime.discovery_records import (
+        record_document,
+        record_from_document,
+    )
+
+    document = record_document(
+        ToolAsset("vulture", "vulture", "uv", (wheel,), "vulture")
+    )
+    return record_from_document(document).versions[0].python == ">=3.9"
+
+
 def test_package_is_optional_and_stored_as_registered():
     """package may be absent; whatever was registered is returned verbatim."""
     handle = open_record_store(":memory:")
@@ -401,14 +464,18 @@ def test_package_is_optional_and_stored_as_registered():
     handle.close()
 
 
-def test_frozen_sql_file_is_the_ddl_the_code_executes():
-    """data/record_schema.sql is the single authority: executing it produces
-    exactly the parity tables, and the loader returns it verbatim."""
+def test_frozen_sql_is_a_package_resource_and_the_live_ddl():
+    """The frozen DDL ships inside the package (independent installs work)
+    and executing it produces exactly the parity tables."""
     import sqlite3
+    from importlib.resources import files as resource_files
 
-    from vesryn_tool_runtime.record_schema import SCHEMA_PATH, schema_sql
+    import vesryn_tool_runtime
 
-    assert SCHEMA_PATH.name == "record_schema.sql"
+    names = {
+        item.name for item in resource_files(vesryn_tool_runtime.__package__).iterdir()
+    }
+    assert SCHEMA_RESOURCE in names and SEED_RESOURCE in names
     db = sqlite3.connect(":memory:")
     db.executescript(schema_sql())
     for table, columns in TABLE_COLUMNS.items():
@@ -417,13 +484,38 @@ def test_frozen_sql_file_is_the_ddl_the_code_executes():
     db.close()
 
 
+def test_constraint_stripped_databases_are_refused(tmp_path):
+    """Same column names without the constraints must fail the drift check —
+    column-name parity alone proves nothing."""
+    import sqlite3
+
+    stripped = tmp_path / "stripped.sqlite3"
+    db = sqlite3.connect(stripped)
+    db.executescript(
+        "CREATE TABLE tool_asset (tool_id TEXT, name TEXT, provider TEXT,"
+        " package TEXT, entrypoint TEXT);"
+        "CREATE TABLE tool_release (tool_id TEXT, version TEXT, platform_os TEXT,"
+        " platform_arch TEXT, platform_abi TEXT, platform_python TEXT,"
+        " source TEXT, digest_type TEXT, digest TEXT);"
+        "CREATE TABLE tool_group (group_id TEXT, summary TEXT);"
+        "CREATE TABLE tool_group_member (group_id TEXT, tool_id TEXT, summary TEXT);"
+        "CREATE TABLE tool_group_member_alias (group_id TEXT, tool_id TEXT,"
+        " alias TEXT);"
+        "CREATE TABLE tool_access (access_id TEXT, tool_id TEXT, method TEXT,"
+        " target TEXT, contract TEXT, summary TEXT);"
+    )
+    db.execute("PRAGMA user_version = 2")
+    db.commit()
+    db.close()
+    with pytest.raises(RecordError, match="schema_drift"):
+        open_record_store(stripped)
+
+
 def test_committed_library_round_trips_the_seeded_examples():
     """data/records.sqlite3 — built from the frozen schema and seed.sql —
     opens through the public gateways and returns the issue's literal
     examples exactly."""
-    from vesryn_tool_runtime.record_schema import SCHEMA_PATH
-
-    path = SCHEMA_PATH.with_name("records.sqlite3")
+    path = Path(__file__).resolve().parents[1] / "data" / "records.sqlite3"
     handle = open_record_store(path)
     asset = handle.assets.get("trivy")
     assert (asset.provider, asset.entrypoint) == ("github-release", "trivy")

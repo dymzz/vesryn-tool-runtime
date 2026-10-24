@@ -10,7 +10,12 @@ it installs nothing, authorizes nothing and executes nothing.
 
 import re
 
-from .discovery_records import record_from_document
+from .discovery_records import (
+    ToolAccess,
+    ToolAsset,
+    ToolGroup,
+    record_from_document,
+)
 from .documents import ToolRuntimeError
 from .schemas import NAME, object_schema, validate
 
@@ -341,11 +346,27 @@ class DiscoveryErrorDocument:
             _fail("invalid_document")
 
 
-def _as_record_document(record):
-    """Accept a record object or its document; the record layer validates."""
+RECORD_KIND_TYPES = {
+    "tool-asset": ToolAsset,
+    "tool-group": ToolGroup,
+    "tool-access": ToolAccess,
+}
+
+
+def _as_record_document(record, record_kind):
+    """Accept a record object or its document; type must match the page.
+
+    A page declaring ``tool-group`` cannot carry a ToolAccess document —
+    mixed pages are rejected so type-based parsing stays reliable.
+    """
+    expected = RECORD_KIND_TYPES[record_kind]
     if isinstance(record, dict):
-        record_from_document(record)
+        parsed = record_from_document(record)
+        if not isinstance(parsed, expected):
+            _fail("invalid_document")
         return record
+    if not isinstance(record, expected):
+        _fail("invalid_document")
     from .discovery_records import record_document
 
     return record_document(record)
@@ -400,7 +421,9 @@ class DiscoveryPage:
                 _fail(code)
         elif next_offset is not None:
             _fail(code)
-        self.records = tuple(_as_record_document(record) for record in records)
+        self.records = tuple(
+            _as_record_document(record, record_kind) for record in records
+        )
         if not isinstance(diagnostics, tuple) or any(
             not isinstance(item, DiscoveryDiagnostic) for item in diagnostics
         ):
@@ -436,7 +459,8 @@ class DiscoveryPage:
         try:
             document["query"] = DiscoveryQuery.from_document(document["query"])
             document["records"] = tuple(
-                _as_record_document(record) for record in document["records"]
+                _as_record_document(record, document["record_kind"])
+                for record in document["records"]
             )
             document["diagnostics"] = tuple(
                 DiscoveryDiagnostic.from_document(item)
