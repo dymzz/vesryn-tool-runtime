@@ -30,6 +30,19 @@ from .contracts import (
     ToolResult,
     ToolSpec,
 )
+from .discovery_contracts import (
+    AccessEntrySummary,
+    CandidateSummary,
+    ContractDetail,
+    DiscoveryContractError,
+    DiscoveryDiagnostic,
+    DiscoveryErrorDocument,
+    DiscoveryPage,
+    DiscoveryQuery,
+    GroupMember,
+    GroupSummary,
+    compose_access_id,
+)
 from .documents import ToolRuntimeError
 from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_tool
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
@@ -45,6 +58,7 @@ from .uv_assets import UvLock, UvToolBackend
 
 __all__ = [
     "SELECTION_BINDING",
+    "AccessEntrySummary",
     "Aria2NativeBackend",
     "Aria2Source",
     "AssetDefinition",
@@ -56,10 +70,19 @@ __all__ = [
     "AssetRelease",
     "AssetSelection",
     "AssetTarget",
+    "CandidateSummary",
     "Catalog",
+    "ContractDetail",
+    "DiscoveryContractError",
+    "DiscoveryDiagnostic",
+    "DiscoveryErrorDocument",
+    "DiscoveryPage",
+    "DiscoveryQuery",
     "DiscoveryScope",
     "DispatchReceipt",
     "ExecutionContext",
+    "GroupMember",
+    "GroupSummary",
     "Invocation",
     "NativeAssetDelivery",
     "SharedAssetDefinition",
@@ -74,6 +97,7 @@ __all__ = [
     "canonical_binding",
     "checked_result",
     "compose",
+    "compose_access_id",
     "create_binding",
     "invoke_tool",
     "load_shared_definitions",
