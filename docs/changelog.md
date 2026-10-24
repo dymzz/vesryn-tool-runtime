@@ -69,7 +69,23 @@
   explicit example associations pending formal consumer check contracts. OCI
   installation is delegated to Dagger; no Runtime OCI installer is added.
 
-## Unreleased
+## 0.3.1 — Linux asset target corrections
+
+- Publish the deptry GNU-libc declaration and libc-aware uv lock resolution
+  from issue #29; the publisher artifact URL and SHA-256 remain unchanged.
+- Supply the known GNU target in the Python asset consumption example. The
+  uv preparation example derives its local Linux libc and rejects an unknown
+  value; its separate container lock explicitly targets GNU Linux.
+- Retain independently traceable Semgrep Dagger version evidence from PR #30.
+  This proves one pinned-image version call, not a project scan.
+- Synchronize package metadata, the existing Dagger wheel output and installed
+  package checks to 0.3.1. See the [release evidence](https://github.com/dymzz/vesryn-tool-runtime/releases/tag/v0.3.1)
+  for the #12 acceptance, original preparation records and consumer reproduction.
+
+### Included discovery prototype
+
+The following summary-model code is included from the existing main baseline;
+its separate #14 acceptance is not part of this asset-consumer patch.
 
 - Add the discovery field contract foundation for TR-DISC-01A (issue #27): the
   single field authority for #14's grouped discovery and access entry queries —
