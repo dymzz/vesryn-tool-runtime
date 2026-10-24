@@ -105,8 +105,13 @@ assert selection.release.sha256 == (
 
 ## Verification Status
 
-- **Semgrep 1.99.0**: Verified by pulling and executing inside a live Dagger Engine container,
-  verifying `--version` output `1.99.0`.
+- **Semgrep 1.99.0**: The original [reported result](../verification/tr-asset-ci-01d.json)
+  has no located native run source. A separate [2026-10-24 Dagger capture](../verification/tr-asset-ci-01d-semgrep/README.md)
+  now provides the submitted query, complete native response, native execution log,
+  process record and file hashes. The pinned Linux amd64 image was reused from cache;
+  one actual `exec.processRun` returned stdout `1.99.0` and exit code `0`.
+  No scan or other platform was tested. The offline source/entrypoint unit test is
+  a metadata assertion, not live execution evidence.
 - **Lychee 0.18.0**: Upstream release metadata, Git tag, commit SHA, multi-arch index, and
   platform manifest digests verified against Docker Hub registry API. Execution status is retained
   as an unexecuted declaration; neither local installation nor a successful check is claimed.

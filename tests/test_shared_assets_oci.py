@@ -1,4 +1,4 @@
-"""OCI shared assets: verified declarations, multi-arch digests and Dagger consumption."""
+"""Offline OCI declaration and selection tests; these do not execute Dagger."""
 
 import pytest
 
@@ -174,8 +174,8 @@ def test_oci_releases_preserve_index_boundary_without_inventing_installation(tmp
     assert exc_info.value.code == "backend_unknown"
 
 
-def test_semgrep_immutable_digest_consumable_by_dagger():
-    """Verify that Semgrep's immutable OCI source string is natively consumable."""
+def test_semgrep_selection_retains_pinned_oci_source_and_entrypoint():
+    """Check selected metadata only; live Dagger evidence is stored separately."""
     records = {r.definition.asset_id: r for r in load_shared_definitions("oci.json")}
     definition = records["semgrep"].definition
     catalog = Catalog()

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-10-24T03:28:39.7863372Z",
+  "finished_at": "2026-10-24T03:29:03.6030502Z",
+  "command": "dagger",
+  "arguments": [
+    "--progress",
+    "plain",
+    "--debug",
+    "query",
+    "-M",
+    "--doc",
+    "D:\\workspace\\vesryn\\.artifacts\\semgrep-dagger-evidence-20261024\\query.graphql"
+  ],
+  "workspace": "Vesryn .artifacts/semgrep-dagger-evidence-20261024",
+  "child_environment": {
+    "FORCE_DARK_MODE": "1"
+  },
+  "timeout_seconds": 150,
+  "timed_out": false,
+  "process_exit_code": 0,
+  "stdout": "dagger.stdout.json",
+  "stderr": "dagger.stderr.log",
+  "query": "query.graphql"
+}

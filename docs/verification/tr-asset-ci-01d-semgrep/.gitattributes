@@ -1,0 +1,6 @@
+# Preserve captured bytes so sha256.json remains valid on every checkout.
+query.graphql -text
+dagger.stdout.json -text
+dagger.stderr.log -text -whitespace
+process.json -text whitespace=cr-at-eol
+sha256.json -text whitespace=cr-at-eol
