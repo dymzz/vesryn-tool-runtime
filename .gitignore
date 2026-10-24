@@ -1,18 +1,38 @@
-.venv/
+# Python
 __pycache__/
+*.pyc
+.venv/
+
+# Tool-owned caches: each tool keeps its own directory
 .pytest_cache/
 .ruff_cache/
-.test-tools/
+.hypothesis/
+
+# Unified redirect for tool caches
+.cache/
+
+# Temporary files
+.tmp/
+.tmp*/
+
+# Test artifacts: screenshots, reports, failed cases
+.artifacts/
+
+# Build outputs
+dist/
+build/
+
+# Environment
 .env
 .env.*
 !.env.example
-dist/
+
+# Local working state
 .log/
 .dagger/sdk/
-.tmp/
-/.tmp/
 .unregistered/
 /.unregistered/
 .agent/
 .agents/
-/.agents/
+.test-tools/
+.issue-*.md

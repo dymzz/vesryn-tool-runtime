@@ -97,3 +97,21 @@ its separate #14 acceptance is not part of this asset-consumer patch.
   algorithm is introduced. See
   [discovery field contracts](discovery-contracts.md) and the
   [issue #27 delivery](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md).
+## Unreleased
+
+- Redo the discovery record foundation for the reopened issue #27: the three
+  logical records — ToolAsset, ToolGroup, ToolAccess — on six constrained
+  SQLite tables; the frozen DDL and seed ship as package resources
+  (`record_schema.sql`, `record_seed.sql`) read via `importlib.resources`,
+  the writable store location is always caller-supplied, releases carry
+  platform ABI and interpreter constraints, and the parity check compares
+  the full DDL, not column names. Foreign keys, enum CHECKs, uniqueness and NOT NULL
+  constraints live in the schema itself; member summaries and aliases are
+  member-level only; every entry carries its own method/target/contract; no
+  asset_id column exists. Records serialize with strict round trips and the
+  query layer carries their documents directly, replacing the five PR #28
+  deviations (including the forced access_id composition); old formats are
+  explicitly unsupported with no compatibility layer. See
+  [discovery contracts](discovery-contracts.md) and the
+  [issue #27 redo record](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md).
+
