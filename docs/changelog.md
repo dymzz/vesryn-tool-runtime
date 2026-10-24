@@ -68,3 +68,16 @@
   backends remain compatible. actionlint, ShellCheck, zizmor and Trivy retain
   explicit example associations pending formal consumer check contracts. OCI
   installation is delegated to Dagger; no Runtime OCI installer is added.
+
+## Unreleased
+
+- Add the discovery field contract foundation for TR-DISC-01A (issue #27): the
+  single field authority for #14's grouped discovery and access entry queries —
+  strict-versioned documents (query, page, group/candidate/access-entry
+  summaries, contract detail, diagnostics, errors), the composed
+  `<catalog_ref>:<tool_id>@<entry_key>` access identity, separated fact-state
+  enums with safe defaults, disclosure-bounded summaries and canonical JSON
+  Schemas. No retrieval, ranking, admission, binding-management or health
+  algorithm is introduced. See
+  [discovery field contracts](discovery-contracts.md) and the
+  [issue #27 delivery](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md).
