@@ -82,7 +82,10 @@
   package checks to 0.3.1. See the [release evidence](https://github.com/dymzz/vesryn-tool-runtime/releases/tag/v0.3.1)
   for the #12 acceptance, original preparation records and consumer reproduction.
 
-## Unreleased
+### Included discovery prototype
+
+The following summary-model code is included from the existing main baseline;
+its separate #14 acceptance is not part of this asset-consumer patch.
 
 - Add the discovery field contract foundation for TR-DISC-01A (issue #27): the
   single field authority for #14's grouped discovery and access entry queries —
