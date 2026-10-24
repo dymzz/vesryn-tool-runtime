@@ -45,6 +45,11 @@ from .discovery_contracts import (
     compose_access_id,
 )
 from .documents import ToolRuntimeError
+from .group_discovery import (
+    discover_group_members,
+    discover_groups,
+    group_summary,
+)
 from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_tool
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
 from .registry import compose, provider
@@ -105,6 +110,9 @@ __all__ = [
     "compose",
     "compose_access_id",
     "create_binding",
+    "discover_group_members",
+    "discover_groups",
+    "group_summary",
     "invoke_tool",
     "load_shared_definitions",
     "native_asset_directory",

@@ -1,0 +1,50 @@
+{
+  "issue": 35,
+  "stage": "TR-DISC-01E / 14-E",
+  "checked": "2026-10-24",
+  "baseline": {
+    "branch": "dsh-35-progressive-group-discovery",
+    "based_on": "dsh-34-tool-access-resolution@c245f9e",
+    "package_version": "0.3.0",
+    "note": "stacked working-tree delivery; not a release"
+  },
+  "data_sources": {
+    "asset_tool": {
+      "document": "src/vesryn_tool_runtime/shared_assets/security.json",
+      "asset_id": "trivy",
+      "tool_id": "trivy",
+      "versions": ["0.76.1"],
+      "usage": "asset-only member referenced by two groups; no contract invented"
+    },
+    "contract_tool": {
+      "module": "github.com/dymzz/engineering-ci@9949e22dc03e4361bb46540ca5a4d51c1cefd3ae",
+      "function": "EngineeringCi.repositoryTestArtifacts",
+      "snapshot": "tests/fixtures/dagger/engineering-ci-9949e22.schema.json.gz",
+      "exposures": "tests/fixtures/dagger/engineering-ci-9949e22.exposures.toml",
+      "tool_id": "pytest.artifacts",
+      "contract_sha256": "9386a8008c8d604b4630dc3550c26168456fa347be2d267db29dea1964690f19",
+      "note": "exposure adds domain=test for candidate summaries; domain is outside the contract digest"
+    },
+    "groups": [
+      {"group_id": "ci.security", "members": ["trivy"], "aliases": ["ci-security", "security", "vulnerability"]},
+      {"group_id": "ci.release", "members": ["trivy", "pytest.artifacts"], "aliases": ["ci-release", "sbom", "evidence"]},
+      {"group_id": "ci.quality", "members": ["pytest.artifacts"], "aliases": ["ci-quality", "tests", "evidence"]}
+    ]
+  },
+  "checks": {
+    "new_group": "tests/test_group_discovery.py: 13 passed",
+    "entry_resolution_reused": "tests/test_access_resolution.py: 14 passed",
+    "full_suite": "223 passed, 1 skipped",
+    "lint": "ruff check src tests clean; ruff format --check src tests clean",
+    "no_side_effects": "group discovery and member matching ran with subprocess.run patched to fail",
+    "bounded_members": "members_limit=1 on a two-member group reports member_count=1 plus an undisclosed diagnostic naming the disclosed group",
+    "scope_order": "environment/availability filtering applied before ordering and paging; a group with no visible member is absent from items and totals"
+  },
+  "not_verified": [
+    "ranking/alias scoring beyond deterministic token containment",
+    "execution or installation of any member tool",
+    "binding creation/verification or admission for a selected member",
+    "Dagger or backend health/availability",
+    "Vesryn #31 MCP mapping and engineering-ci consumption of the discovery flow"
+  ]
+}

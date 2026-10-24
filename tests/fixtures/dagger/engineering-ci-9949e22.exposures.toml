@@ -12,4 +12,5 @@ function = "repositoryTestArtifacts"
 effect = "check"
 recovery = "restartable"
 environments = ["container"]
+domain = "test"
 description = "Collect a repository's pytest artifacts through engineering-ci."

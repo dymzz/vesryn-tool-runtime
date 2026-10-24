@@ -12,6 +12,7 @@
 - Shared CI assets: [Python CLI](assets/python-cli.md), [native/workflow](assets/native-workflow.md), [OCI](assets/oci.md), [security scanner](assets/security.md).
 - [Discovery field contracts](discovery-contracts.md): the single field dictionary, identities and fact states for grouped discovery and access entry queries (#14).
 - [Access entry resolution](access-resolution.md): Scope-filtered entries, contracts and structured diagnostics (#34).
+- [Progressive group discovery](group-discovery.md): bounded group summaries, member matching and the entry-query handoff (#35).
 - [TR-ASSET-01C delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md): issue #8 acceptance and evidence.
 - [uv tool environments](uv-tool-assets.md): issue #7 thin uv adapter, per-artifact environments and Linux lock description.
 - [0.2.0 / TR-ASSET-01 acceptance](tasks/vesryn-tool-runtime/P0-local-tool-assets.md): issue #5 joint verification and release criteria.
@@ -20,6 +21,7 @@
 - [TR-DISC-01A delivery](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md): issue #27 discovery field contract foundation.
 - [TR-DISC-01B delivery](tasks/vesryn-tool-runtime/P1-unified-tool-registration.md): issue #32 unified tool registration and live definition migration.
 - [TR-DISC-01D delivery](tasks/vesryn-tool-runtime/P1-tool-access-resolution.md): issue #34 real entry resolution and Scope diagnostics.
+- [TR-DISC-01E delivery](tasks/vesryn-tool-runtime/P1-progressive-group-discovery.md): issue #35 progressive group discovery and bounded member matching.
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): existing C1–C8 acceptance standard.
 - [0.1.0 extraction assessment](delivery/tool-runtime-0.1.0.md): actual evidence, statuses and publication boundary.

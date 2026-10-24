@@ -208,6 +208,10 @@ class Catalog:
             raise WorkflowError(f"Tool group is not registered: {group_id}")
         return self._groups[group_id]
 
+    def groups(self):
+        """Registered group records in group-id order; a read, never a disclosure."""
+        return tuple(self._groups[group_id] for group_id in sorted(self._groups))
+
     def register_access(self, access):
         """Register an access entry record (the #27 AccessEntrySummary)."""
         from .discovery_contracts import AccessEntrySummary
