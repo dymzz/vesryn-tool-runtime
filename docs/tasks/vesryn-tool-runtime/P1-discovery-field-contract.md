@@ -124,3 +124,27 @@ Six review findings, fixed in order on this same branch:
 
 Schema version bumped to 2; `data/records.sqlite3` rebuilt from the new
 frozen schema and seed.
+
+## 2026-10-24 second review fixes (third commit series)
+
+1. **P2 — single home for the interpreter constraint**: `Platform.python`
+   is deleted (a second definition silently lost through document and
+   database round trips). The platform keeps os/arch/abi only; the
+   interpreter requirement lives solely on `ToolAssetVersion.python`,
+   asserted by a TypeError test for the platform kwarg and a full
+   document + store round trip on the version.
+2. **P2 — seed URLs from official metadata**: Hypothesis 6.170.9's wheel
+   and sdist sources (previously derived from the digest and 404ing) are
+   replaced with the official `urls[].url` values for the same digests;
+   the `package` field carries the plain package name (`hypothesis` —
+   extras like `[cli]` are not part of the package name and broke
+   metadata lookups). All five uv seed entries (hypothesis,
+   import-linter, mutmut, schemathesis, vulture) re-verified against
+   live PyPI metadata: URL and SHA-256 all match.
+3. **Delivery state made honest**: the four newly registered tools
+   (import-linter 2.15, hypothesis 6.170.9, mutmut 3.8.0,
+   schemathesis 4.32.4) existed only as uncommitted local diffs during
+   review; they are now committed with this series — seed SQL, rebuilt
+   `data/records.sqlite3` and the round-trip/package-name tests — so the
+   PR's package actually delivers them. Tool installation, Binding and
+   execution remain outside this acceptance, as stated.

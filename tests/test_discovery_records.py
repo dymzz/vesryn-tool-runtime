@@ -21,6 +21,8 @@ from vesryn_tool_runtime.discovery_records import (
     ToolAsset,
     ToolAssetVersion,
     ToolGroup,
+    record_document,
+    record_from_document,
 )
 from vesryn_tool_runtime.record_schema import (
     SCHEMA_RESOURCE,
@@ -385,6 +387,29 @@ def test_persistence_across_reopen(tmp_path):
         open_record_store(path)
 
 
+def test_interpreter_constraint_lives_only_on_the_version():
+    """Platform carries os/arch/abi and nothing else: the python kwarg is a
+    TypeError, and the interpreter constraint round-trips on the version."""
+    with pytest.raises(TypeError):
+        Platform("linux", "x86_64", "gnu", python=">=3.12")
+    version = ToolAssetVersion(
+        "1",
+        "https://e.invalid/a",
+        "sha256",
+        "0" * 64,
+        Platform("linux", "x86_64", "gnu"),
+        ">=3.12",
+    )
+    handle = open_record_store(":memory:")
+    handle.assets.put(ToolAsset("t", "t", "uv", (version,), "t"))
+    back = handle.assets.get("t").versions[0]
+    assert back.platform == Platform("linux", "x86_64", "gnu")
+    assert back.python == ">=3.12"
+    document = record_document(handle.assets.get("t"))
+    assert document["versions"][0]["python"] == ">=3.12"
+    handle.close()
+
+
 def test_platform_and_interpreter_constraints_are_real_fields():
     """deptry-shaped releases keep abi and interpreter constraints; same
     version and os/arch with a different ABI coexist instead of colliding."""
@@ -517,6 +542,16 @@ def test_committed_library_round_trips_the_seeded_examples():
     examples exactly."""
     path = Path(__file__).resolve().parents[1] / "data" / "records.sqlite3"
     handle = open_record_store(path)
+    for tool_id in (
+        row[0]
+        for row in handle._db.execute(
+            "SELECT tool_id FROM tool_asset WHERE provider='uv' ORDER BY tool_id"
+        )
+    ):
+        seeded = handle.assets.get(tool_id)
+        assert record_from_document(record_document(seeded)) == seeded
+        assert seeded.package is None or "[" not in seeded.package
+
     asset = handle.assets.get("trivy")
     assert (asset.provider, asset.entrypoint) == ("github-release", "trivy")
     (release,) = asset.versions

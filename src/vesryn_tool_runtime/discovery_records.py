@@ -50,17 +50,16 @@ class Platform:
     """The explicit platform of a platform-specific asset.
 
     ``os``/``arch`` are the machine facts; ``abi`` is the C-library/ABI
-    constraint (e.g. ``gnu``, ``musl``) and ``python`` the interpreter
-    requirement string (e.g. ``>=3.10``) a release actually carries — real
-    artifacts state these (deptry's manylinux wheel is abi ``gnu`` with
-    ``>=3.10``), and same-version releases that differ only in ABI or
-    interpreter range are distinct records, not conflicts.
+    constraint (e.g. ``gnu``, ``musl``) — real artifacts state these
+    (deptry's manylinux wheel is abi ``gnu``), and same-version releases
+    differing only in ABI are distinct records, not conflicts. The
+    interpreter requirement is NOT a platform fact: it lives on the
+    version record (``ToolAssetVersion.python``) alone.
     """
 
     os: str
     arch: str
     abi: str | None = None
-    python: str | None = None
 
     def __post_init__(self):
         _name(self.os, "invalid_record", 64)
