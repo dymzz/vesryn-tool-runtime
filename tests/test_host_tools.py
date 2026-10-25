@@ -151,6 +151,7 @@ def test_native_install_needs_pinned_backend(env):
             root=env["root"],
             environ=env["environ"],
             runner=run_fake_uv,
+            platform="windows",
         )
 
 
