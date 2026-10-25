@@ -216,7 +216,9 @@ def test_uninstall_removes_registration_and_refreshes_list(env):
 
     result = uninstall_tool("vulture", root=env["root"], runner=fake_uv)
     assert result["status"] == "uninstalled"
-    assert calls and calls[0][1:3] == ["tool", "uninstall"]
+    # Reused-external registrations are not uv-owned: uninstall removes the
+    # registration and the list entry, and leaves the command alone.
+    assert calls == []
     assert read_json(tools_json(env["root"])) == []
 
 

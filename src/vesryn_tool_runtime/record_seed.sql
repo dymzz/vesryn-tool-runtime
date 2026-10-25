@@ -619,3 +619,41 @@ VALUES
    'https://files.pythonhosted.org/packages/a0/56/0cc15b8ff2613c1d5c3dc1f3f576ede1c43868c1bc2e5ccaa2d4bcd7974d/vulture-2.14-py2.py3-none-any.whl',
    'sha256',
    'd9a90dba89607489548a49d557f8bac8112bd25d3cbc8aeef23e860811bd5ed9');
+
+-- Windows x86_64 releases: verified against official GitHub Release
+-- metadata on 2026-10-25 (issue #33 host preparation; this host's targets).
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('trivy', '0.76.1', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_windows-64bit.zip',
+   'sha256',
+   '1051f49cb22d5284f43425f72aad9cda63ca12ceb92e7caa06903490c82dc9bf'),
+  ('actionlint', '1.7.12', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_windows_amd64.zip',
+   'sha256',
+   '6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9'),
+  ('shellcheck', '0.11.0', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip',
+   'sha256',
+   '8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e'),
+  ('zizmor', '1.31.1', 'windows', 'x86_64', 'msvc', NULL,
+   'https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-x86_64-pc-windows-msvc.zip',
+   'sha256',
+   '4de30371c8a3b483aecbcf0dec1fd6a2b6aae65051ca226b4f6527baac6a8c7a'),
+  ('osv-scanner', '2.6.0', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_windows_amd64.exe',
+   'sha256',
+   'e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6');
+
+-- deptry windows x86_64 wheel: verified against official PyPI metadata
+-- on 2026-10-25 (issue #33 host preparation on a windows host).
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('deptry', '0.25.1', 'windows', 'x86_64', 'gnu', '>=3.10',
+   'https://files.pythonhosted.org/packages/7a/6a/3f82f7a06217778282bc4456af1b4ffb3bc4b2c8e7891d00e8323f9ad0b8/deptry-0.25.1-cp310-abi3-win_amd64.whl',
+   'sha256',
+   'b59a560cb7dffb21832a98bb80d33d614cfb5630ea36ce21833eabf4eae3df99');

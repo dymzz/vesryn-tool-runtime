@@ -245,6 +245,39 @@ def prepare_tool(
     )
     if asset is None:
         raise HostToolError("unknown_tool", tool_id)
+    declared_versions = {item.version for item in asset.versions}
+
+    # Probe the target shell FIRST: an already-resolvable entry whose
+    # reported version matches ANY declared release is reused as-is —
+    # reuse needs no artifact, so a platform-row mismatch must not gate it.
+    entry, shown = _probe(command, environ, runner)
+    if entry is not None:
+        if shown is None or not any(v in shown for v in declared_versions):
+            return _outcome(
+                "conflict",
+                tool_id,
+                command,
+                version,
+                entry,
+                detail=f"existing entry reports: {(shown or '')[:120]}",
+            )
+        matched = next(
+            v for v in sorted(declared_versions, key=len, reverse=True) if v in shown
+        )
+        return _register(
+            root,
+            asset,
+            command,
+            matched,
+            entry,
+            description,
+            "external",
+            reused=True,
+            source_verified=False,
+            status="reused",
+            environ=environ,
+        )
+
     release = _find_release(asset, version, environ, platform)
     version = release.version
 
@@ -387,6 +420,9 @@ def _expose_native_entry(tool_id, payload, root, environ=None):
     import hashlib
 
     target = bin_home() / Path(payload).name
+    # A Windows entry must carry .exe or the shell cannot resolve it.
+    if sys_platform() == "windows" and target.suffix == "":
+        target = target.with_suffix(".exe")
     if target.exists():
 
         def _hash(path):
@@ -450,6 +486,10 @@ def _register(
     try:
         # Idempotent: an identical registration (same tool, same content)
         # just updates the host facts below.
+        # The bundled declaration is THE authority for this path: when the
+        # stored asset row differs (e.g. the declaration gained a release),
+        # sync the row to it. Conflicts are a composition concern, not a
+        # sync concern.
         try:
             existing = store.assets.get(asset.tool_id)
         except RecordError:
@@ -457,7 +497,8 @@ def _register(
         if existing is None:
             store.assets.put(asset)
         elif existing != asset:
-            raise RecordError("duplicate_tool_id")
+            # The declaration gained releases; sync the derived row.
+            store.assets.put(asset, sync=True)
         store._db.execute(
             "INSERT OR REPLACE INTO tool_install"
             " (tool_id, command, version, entry, description, prepared_via,"
