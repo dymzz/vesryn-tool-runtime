@@ -307,28 +307,52 @@ def test_alias_registration_is_order_insensitive_and_idempotent():
     store.close()
 
 
-def test_native_delivery_entry_reads_its_declared_source_argument(tmp_path):
-    """Regression: the CLI declares --source-artifact and must read exactly
-    that attribute; the previous args.source_art crashed before any backend
-    call. A stub aria2 path takes the run past the argument site (it fails
-    later at the backend, which is expected and not an AttributeError)."""
-    import subprocess
+def test_native_delivery_entry_passes_source_artifact_to_backend(monkeypatch, tmp_path):
+    """Regression for the args.source_art typo: with valid CLI choices the
+    run reaches the backend, and the declared --source-artifact value is
+    the one handed to prepare(). Restoring the old typo must fail this —
+    the AttributeError fires before any backend call."""
+    import importlib.util
     import sys
+    from types import SimpleNamespace
 
+    spec = importlib.util.spec_from_file_location(
+        "native_delivery_entry",
+        Path(__file__).resolve().parents[1] / "examples" / "native_asset_delivery.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    captured = {}
+
+    def stub_prepare(
+        self, selection, *, policy, allow_network=False, source_artifact=None
+    ):
+        captured["selection"] = selection
+        captured["source_artifact"] = source_artifact
+        return SimpleNamespace(
+            document=lambda: {"stub": True},
+            outcome=SimpleNamespace(status="failed", exit_code=3, reason="stub"),
+        )
+
+    monkeypatch.setattr(module.Aria2NativeBackend, "prepare", stub_prepare)
     stub = tmp_path / "aria2c.exe"
     stub.write_bytes(b"stub")
-    result = subprocess.run(
+    monkeypatch.setattr(
+        sys,
+        "argv",
         [
-            sys.executable,
-            "examples/native_asset_delivery.py",
+            "native_asset_delivery.py",
             "--asset",
-            "trivy",
+            "hyperfine",
             "--version",
-            "0.76.1",
+            "2.0.0",
             "--os",
             "linux",
             "--arch",
             "x86_64",
+            "--abi",
+            "gnu",
             "--root",
             str(tmp_path / "root"),
             "--aria2",
@@ -342,11 +366,9 @@ def test_native_delivery_entry_reads_its_declared_source_argument(tmp_path):
             "--source-artifact",
             str(stub),
         ],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=Path(__file__).resolve().parents[1],
-        timeout=120,
     )
-    assert "AttributeError" not in result.stderr
-    assert "source_art" not in result.stderr
+    assert module.main() == 3
+    assert captured["selection"].asset_id == "hyperfine"
+    from pathlib import Path as _Path
+
+    assert _Path(captured["source_artifact"]) == stub

@@ -134,3 +134,13 @@ no release.
    declared `--source-artifact` but read `args.source_art` (AttributeError
    before any backend call); it reads the declared attribute again, with a
    stub-backend regression test that runs the CLI past the argument site.
+
+## 2026-10-25 second review fix (fifth commit, on top of 225d81c)
+
+The CLI regression test was vacuous: `--asset trivy` is not an allowed
+choice, so argparse exited before the fixed code ran and the old typo
+satisfied the same stderr assertions. Rewritten in-process with the
+supported hyperfine choices: a stub `Aria2NativeBackend.prepare` captures
+the call, the test asserts the backend was reached and the declared
+`--source-artifact` value is the one handed over. Verified bidirectionally:
+passes on the fix, fails with the old `args.source_art` spelling restored.
