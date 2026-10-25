@@ -74,7 +74,10 @@ def test_user_data_root_override_and_defaults(tmp_path):
         == tmp_path / "custom"
     )
     assert (
-        user_data_root(environ={"LOCALAPPDATA": str(tmp_path / "la"), "PATH": ""})
+        user_data_root(
+            environ={"LOCALAPPDATA": str(tmp_path / "la"), "PATH": ""},
+            platform="windows",
+        )
         == tmp_path / "la" / "vesryn" / "data"
     )
     assert (
