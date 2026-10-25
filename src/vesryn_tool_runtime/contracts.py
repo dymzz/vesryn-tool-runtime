@@ -148,14 +148,19 @@ class Catalog:
         self._tools[spec.tool_id] = (spec, adapter)
 
     def register_asset(self, definition, *, tools):
-        """Associate one immutable CLI release definition with existing capabilities."""
-        from .assets import AssetDefinition, AssetError
+        """Associate one immutable CLI release definition with tool keys.
+
+        Tool keys register directly — no capability ToolSpec, Adapter or
+        Binding is a prerequisite (issue #32); the legacy selection surface
+        kept here for the preparation backends reads them by key.
+        """
+        from .assets import AssetDefinition, AssetError, _token
 
         tools = tuple(tools)
         if not isinstance(definition, AssetDefinition) or not tools:
             raise AssetError("invalid_definition")
-        if any(tool_id not in self._tools for tool_id in tools):
-            raise AssetError("unregistered_tool")
+        for tool_id in tools:
+            _token(tool_id)
         existing = self._assets.get(definition.asset_id)
         if (existing is not None and existing != definition) or any(
             tool_id in self._tool_assets
@@ -167,14 +172,19 @@ class Catalog:
         self._tool_assets.update({tool_id: definition.asset_id for tool_id in tools})
 
     def asset_for(self, tool_id, *, scope=None):
-        """Read asset metadata; no local state, acquisition or admission is implied."""
+        """Read asset metadata by tool key; no acquisition is implied.
+
+        A key registered only as an asset is readable without a capability;
+        scope filtering still applies when a capability exists.
+        """
         from .assets import AssetError
 
-        if tool_id not in self._tools:
-            raise AssetError("unregistered_tool")
-        self.resolve(tool_id, scope=scope)
+        if tool_id in self._tools:
+            self.resolve(tool_id, scope=scope)
         if tool_id not in self._tool_assets:
-            raise AssetError("unregistered_asset")
+            raise AssetError(
+                "unregistered_asset" if tool_id in self._tools else "unregistered_tool"
+            )
         return self._assets[self._tool_assets[tool_id]]
 
     def select_asset(

@@ -115,3 +115,19 @@ its separate #14 acceptance is not part of this asset-consumer patch.
   [discovery contracts](discovery-contracts.md) and the
   [issue #27 redo record](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md).
 
+## Unreleased (TR-DISC-01B)
+
+- Migrate live registration onto the #27 record foundation (issue #32): the
+  bundled seed becomes the single live declaration (20 tools — the #27 seeds
+  plus ripgrep, hyperfine, osv-scanner, actionlint, shellcheck, zizmor,
+  semgrep, lychee, pyright, deptry, pylint and vulture's still-used 2.14),
+  the shared_assets JSON documents and their loader are retired, and
+  Catalog.register_asset registers tool keys without a capability
+  prerequisite. New public chain: bundled_records (pure seed read),
+  RecordStore.put_records (atomic batch with idempotent/conflict semantics),
+  compose_catalog/ComposedCatalog (explicit composition and ordered
+  traversal, missing tool vs no-entry distinguished), plus a temporary
+  read-only bridge (legacy_preparation_definitions) for the old preparation
+  callers that #33 removes. See
+  [shared definitions](shared-definitions.md) and the
+  [issue #32 delivery](tasks/vesryn-tool-runtime/P1-unified-tool-registration.md).
