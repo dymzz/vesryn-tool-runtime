@@ -51,6 +51,7 @@ EXPECTED_TOOLS = {
     "pytest-cov": ("uv", 1),
     "memray": ("uv", 2),
     "py-spy": ("uv", 2),
+    "tach": ("uv", 2),
 }
 VULTURE_214_URL = (
     "https://files.pythonhosted.org/packages/a0/56/0cc15b8ff2613c1d5c3"

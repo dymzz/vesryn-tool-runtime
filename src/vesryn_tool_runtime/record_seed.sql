@@ -401,6 +401,41 @@ VALUES
    '{"input_schema": {"type": "object"}, "output_schema": {"type": "object"}}',
    'Sample and generate flamegraph profiling records for Python processes');
 
+-- Tach: architecture and module boundary enforcement
+INSERT INTO tool_asset (tool_id, name, provider, package, entrypoint) VALUES
+  ('tach', 'tach', 'uv', 'tach', 'tach');
+
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('tach', '0.35.3', 'windows', 'x86_64', 'msvc',
+   '>=3.10',
+   'https://files.pythonhosted.org/packages/9d/45/7eee8d2f77060b0ee7b9252ccc351e610556df3bf46001d8684b22220f7b/tach-0.35.3-cp37-abi3-win_amd64.whl',
+   'sha256',
+   '1be24413f34fdbca85a137bc7f7904ae92f928b30aa9137e69b52ad0f7fb8237'),
+  ('tach', '0.35.3', 'linux', 'x86_64', 'gnu',
+   '>=3.10',
+   'https://files.pythonhosted.org/packages/e0/52/351847518d94cc736d937b26540c46720ff25ac411c64c3ac80f5e4eb1ce/tach-0.35.3-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl',
+   'sha256',
+   'a0f73de7012495877497b781c571208ed6352cf579f400c83165ce4558b9b23e');
+
+INSERT INTO tool_group_member (group_id, tool_id, summary) VALUES
+  ('ci-quality', 'tach', 'Fast architecture and module boundary enforcement tool for Python');
+
+INSERT INTO tool_group_member_alias (group_id, tool_id, alias) VALUES
+  ('ci-quality', 'tach', 'tach'),
+  ('ci-quality', 'tach', 'architecture'),
+  ('ci-quality', 'tach', 'boundaries');
+
+INSERT INTO tool_access
+  (access_id, tool_id, method, target, contract, summary)
+VALUES
+  ('tach.check', 'tach', 'uv', 'tach check',
+   '{"input_schema": {"type": "object"}, "output_schema": {"type": "object"}}',
+   'Check Python dependency boundaries and architecture rules');
+
+
 -- Migrated from the retired shared_assets declarations (issue #32).
 -- Sources/digests are the verified publisher values; the old JSON
 -- files are historical inputs, not a second live source.
