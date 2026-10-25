@@ -529,7 +529,7 @@ def test_constraint_stripped_databases_are_refused(tmp_path):
         "CREATE TABLE tool_access (access_id TEXT, tool_id TEXT, method TEXT,"
         " target TEXT, contract TEXT, summary TEXT);"
     )
-    db.execute("PRAGMA user_version = 2")
+    db.execute("PRAGMA user_version = 3")
     db.commit()
     db.close()
     with pytest.raises(RecordError, match="schema_drift"):

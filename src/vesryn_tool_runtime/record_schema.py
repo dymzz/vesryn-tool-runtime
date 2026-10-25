@@ -19,7 +19,7 @@ matches it — a same-columns/no-constraints database is refused as drift.
 import sqlite3
 from importlib.resources import files as resource_files
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_RESOURCE = "record_schema.sql"
 SEED_RESOURCE = "record_seed.sql"
@@ -47,6 +47,17 @@ TABLE_COLUMNS = {
         "target",
         "contract",
         "summary",
+    ),
+    "tool_install": (
+        "tool_id",
+        "command",
+        "version",
+        "entry",
+        "description",
+        "prepared_via",
+        "reused",
+        "source_verified",
+        "registered_at",
     ),
 }
 

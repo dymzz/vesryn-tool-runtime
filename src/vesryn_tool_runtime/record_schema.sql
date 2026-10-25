@@ -63,7 +63,20 @@ CREATE TABLE tool_access (
     ),
     summary   TEXT NOT NULL CHECK (length(summary) > 0)
 );
-CREATE TABLE record_schema (
-    schema_version INTEGER PRIMARY KEY CHECK (schema_version = 2)
+CREATE TABLE tool_install (
+    tool_id         TEXT NOT NULL PRIMARY KEY REFERENCES tool_asset (tool_id),
+    command         TEXT NOT NULL CHECK (length(command) > 0),
+    version         TEXT NOT NULL CHECK (length(version) > 0),
+    entry           TEXT,
+    description     TEXT NOT NULL CHECK (length(description) > 0),
+    prepared_via    TEXT NOT NULL CHECK (
+        prepared_via IN ('uv', 'aria2', 'external')
+    ),
+    reused          INTEGER NOT NULL CHECK (reused IN (0, 1)),
+    source_verified INTEGER NOT NULL CHECK (source_verified IN (0, 1)),
+    registered_at   TEXT NOT NULL CHECK (length(registered_at) > 0)
 );
-INSERT INTO record_schema (schema_version) VALUES (2);
+CREATE TABLE record_schema (
+    schema_version INTEGER PRIMARY KEY CHECK (schema_version = 3)
+);
+INSERT INTO record_schema (schema_version) VALUES (3);
