@@ -80,13 +80,9 @@ def user_data_root(environ=None, platform=None):
         return Path(environ["VESRYN_TOOLS_HOME"])
     name = sys_platform(platform)
     if name == "windows":
-        base = environ.get("LOCALAPPDATA") or str(
-            Path.home() / "AppData" / "Local"
-        )
+        base = environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
     else:
-        base = environ.get("XDG_DATA_HOME") or str(
-            Path.home() / ".local" / "share"
-        )
+        base = environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
     if not base:
         raise HostToolError("unknown_user_data_root")
     return Path(base) / "vesryn" / "data"
