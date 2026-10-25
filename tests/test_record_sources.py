@@ -7,9 +7,11 @@ import pytest
 
 from vesryn_tool_runtime import (
     ComposedCatalog,
+    GroupMember,
     RecordError,
     ToolAccess,
     ToolAsset,
+    ToolGroup,
     bundled_records,
     compose_catalog,
     legacy_preparation_definitions,
@@ -255,3 +257,96 @@ def test_composed_catalog_type_and_missing_errors():
     ):
         with pytest.raises(RecordError, match=code):
             getter(key)
+
+
+def test_composition_rejects_dangling_references_after_merge():
+    """A member or entry whose tool is absent from every named source is
+    refused over the merged catalog; a cross-source reference (tool from one
+    source, group from another) resolves fine."""
+    records = bundled_records()
+    trivy_asset = catalog_record(records, "trivy")
+    ghost_group = ToolGroup(
+        "ghost-group", "dangling", (GroupMember("ghost", "no such tool", ()),)
+    )
+    ghost_access = ToolAccess("ghost.cli", "ghost", "native", "ghost", {"i": 1}, "s")
+    with pytest.raises(RecordError, match="unknown_tool"):
+        compose_catalog(records, (ghost_group,))
+    with pytest.raises(RecordError, match="unknown_tool"):
+        compose_catalog(records, (ghost_access,))
+    # Cross-source reference: the tool comes from one source, the group
+    # referencing it from another — valid because the MERGED catalog has both.
+    group = ToolGroup(
+        "ci-extra", "extra", (GroupMember("trivy", "from another source", ()),)
+    )
+    merged = compose_catalog((trivy_asset,), (group,))
+    assert merged.group("ci-extra").members[0].tool_id == "trivy"
+
+
+def test_alias_registration_is_order_insensitive_and_idempotent():
+    """The same member registered with aliases in any input order is one
+    canonical record: storage, documents, equality and re-registration all
+    agree; a genuinely different alias set still conflicts."""
+    member = GroupMember("trivy", "scan", ("z", "a"))
+    assert member.aliases == ("a", "z")
+    group = ToolGroup("ci-order", "s", (member,))
+    store = open_record_store(":memory:")
+    store.put_records(bundled_records())
+    store.put_records((group,))
+    # Re-submit the ORIGINAL input order: same canonical record, idempotent.
+    original = ToolGroup("ci-order", "s", (GroupMember("trivy", "scan", ("z", "a")),))
+    store.put_records((original,))
+    assert store.groups.get("ci-order").members[0].aliases == ("a", "z")
+    assert record_from_document(
+        record_document(store.groups.get("ci-order"))
+    ) == store.groups.get("ci-order")
+    different = ToolGroup(
+        "ci-order", "s", (GroupMember("trivy", "scan", ("a", "z", "m")),)
+    )
+    with pytest.raises(RecordError, match="duplicate_group_id"):
+        store.put_records((different,))
+    store.close()
+
+
+def test_native_delivery_entry_reads_its_declared_source_argument(tmp_path):
+    """Regression: the CLI declares --source-artifact and must read exactly
+    that attribute; the previous args.source_art crashed before any backend
+    call. A stub aria2 path takes the run past the argument site (it fails
+    later at the backend, which is expected and not an AttributeError)."""
+    import subprocess
+    import sys
+
+    stub = tmp_path / "aria2c.exe"
+    stub.write_bytes(b"stub")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "examples/native_asset_delivery.py",
+            "--asset",
+            "trivy",
+            "--version",
+            "0.76.1",
+            "--os",
+            "linux",
+            "--arch",
+            "x86_64",
+            "--root",
+            str(tmp_path / "root"),
+            "--aria2",
+            str(stub),
+            "--aria2-version",
+            "1.37.0",
+            "--aria2-sha256",
+            "0" * 64,
+            "--policy-revision",
+            "regression",
+            "--source-artifact",
+            str(stub),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=Path(__file__).resolve().parents[1],
+        timeout=120,
+    )
+    assert "AttributeError" not in result.stderr
+    assert "source_art" not in result.stderr

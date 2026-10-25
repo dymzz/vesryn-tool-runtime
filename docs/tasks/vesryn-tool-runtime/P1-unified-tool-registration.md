@@ -117,3 +117,20 @@ Out of scope (per task book): backend consumption migration (#33), entry
 resolution and scope diagnostics (#34), group discovery/matching (#35),
 Binding/invocation/events (#15); no new Registry service/runner/installer;
 no release.
+
+## 2026-10-25 review fixes (fourth commit, on top of 0d68941)
+
+1. **P1 — composed references validated after merge**: `ComposedCatalog`
+   now checks every group member and every access against the MERGED asset
+   set — cross-source references resolve, a tool missing from every named
+   source is an explicit `unknown_tool` refusal (ghost groups/entries can
+   no longer pass through to D/E).
+2. **P2 — one canonical alias order**: member aliases are an unordered
+   match set canonicalized (sorted) once at construction; storage rows,
+   documents, equality and idempotent re-registration all share that
+   order, so re-submitting the same member in any input order is stable,
+   while a genuinely different alias set still conflicts.
+3. **P1 — Native CLI entry regression**: `native_asset_delivery.py`
+   declared `--source-artifact` but read `args.source_art` (AttributeError
+   before any backend call); it reads the declared attribute again, with a
+   stub-backend regression test that runs the CLI past the argument site.

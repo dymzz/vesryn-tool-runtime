@@ -61,6 +61,17 @@ class ComposedCatalog:
         self._assets = assets
         self._groups = groups
         self._accesses = accesses
+        # References are validated once, over the MERGED catalog: cross-source
+        # references are fine, but a member or entry whose tool is missing
+        # from every source is an explicit refusal — never a dangling record
+        # downstream consumers cannot resolve.
+        for group in groups.values():
+            for member in group.members:
+                if member.tool_id not in assets:
+                    raise RecordError("unknown_tool")
+        for access in accesses.values():
+            if access.tool_id not in assets:
+                raise RecordError("unknown_tool")
 
     def asset(self, tool_id):
         try:

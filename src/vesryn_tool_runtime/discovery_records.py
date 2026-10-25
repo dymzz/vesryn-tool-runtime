@@ -154,6 +154,10 @@ class GroupMember:
             or len(set(self.aliases)) != len(self.aliases)
         ):
             raise RecordError("invalid_record")
+        # Aliases are an unordered match set with ONE canonical order (sorted).
+        # Construction, storage rows, documents and equality all use it, so
+        # re-registering the same member in any input order stays idempotent.
+        object.__setattr__(self, "aliases", tuple(sorted(self.aliases)))
 
 
 @dataclass(frozen=True)

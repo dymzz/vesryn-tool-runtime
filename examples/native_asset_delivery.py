@@ -85,7 +85,7 @@ def main():
         selection,
         policy=policy,
         allow_network=args.allow_network,
-        source_artifact=args.source_art,
+        source_artifact=args.source_artifact,
     )
     value = {"receipt": receipt.document(), "reason": receipt.outcome.reason}
     if receipt.outcome.status == "passed":
