@@ -197,6 +197,7 @@ def prepare_tool(
     description=None,
     root=None,
     allow_network=False,
+    platform=None,
     uv="uv",
     aria2=None,
     environ=None,
