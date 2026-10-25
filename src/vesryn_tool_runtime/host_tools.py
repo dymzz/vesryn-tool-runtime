@@ -202,7 +202,6 @@ def prepare_tool(
     aria2=None,
     environ=None,
     runner=subprocess.run,
-    platform=None,
 ):
     """Check, prepare, register and sync one tool — the single entry.
 
