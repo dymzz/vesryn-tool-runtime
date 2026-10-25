@@ -32,7 +32,7 @@ from pathlib import Path
 
 from .asset_index import AssetIndex, asset_root
 from .assets import AssetPolicy, AssetTarget
-from .discovery_records import ToolAsset
+from .discovery_records import RecordError, ToolAsset
 from .native_assets import Aria2NativeBackend, Aria2Source
 from .record_sources import legacy_preparation_definitions
 from .record_store import open_record_store
@@ -97,6 +97,19 @@ def sys_platform(platform=None):
 
 def tools_database(root):
     return Path(root) / "tools.sqlite3"
+
+
+def bin_home(environ=None):
+    """Exposure directory for entries NOT managed by uv: ~/.vesryn/bin.
+
+    uv-managed CLIs stay in uv's own location (~/.local/bin). Native
+    payloads stay verified in the asset store; this directory holds the
+    runnable copies so ONE host-side PATH entry exposes every non-uv tool.
+    ``VESRYN_BIN_HOME`` overrides (tests and non-default layouts).
+    """
+    environ = os.environ if environ is None else environ
+    override = environ.get("VESRYN_BIN_HOME")
+    return Path(override) if override else Path.home() / ".vesryn" / "bin"
 
 
 def tools_json(root):
@@ -330,9 +343,8 @@ def prepare_tool(
             None,
             detail=receipt.outcome.reason or "",
         )
-    entry = str(
-        backend.delivery(selection, policy=AssetPolicy("host-prepare")).executable
-    )
+    payload = backend.delivery(selection, policy=AssetPolicy("host-prepare")).executable
+    entry = str(_expose_native_entry(tool_id, Path(payload), root, environ=environ))
     return _register(
         root,
         asset,
@@ -365,6 +377,60 @@ def _uv_install(uv, asset, release, runner):
         )
 
 
+def _expose_native_entry(tool_id, payload, root, environ=None):
+    """Copy the verified payload entry into ~/.vesryn/bin (the exposure
+    directory for non-uv tools). The verified payload stays in the asset
+    store. An existing file with IDENTICAL bytes is our own previous copy
+    (idempotent re-exposure after a failed registration); different bytes
+    are an explicit conflict — unknown-ownership commands are never
+    overwritten."""
+    import hashlib
+
+    target = bin_home() / Path(payload).name
+    if target.exists():
+
+        def _hash(path):
+            with path.open("rb") as stream:
+                return hashlib.file_digest(stream, "sha256").hexdigest()
+
+        if _hash(target) != _hash(payload):
+            owner = "an unregistered command"
+            database = tools_database(root)
+            if database.exists():
+                store = open_record_store(database)
+                try:
+                    row = store._db.execute(
+                        "SELECT tool_id FROM tool_install WHERE entry = ?",
+                        (str(target),),
+                    ).fetchone()
+                    owner = row[0] if row else owner
+                finally:
+                    store.close()
+            raise HostToolError(
+                "entry_conflict",
+                f"{target} is owned by {owner}",
+            )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(payload, target)
+    return target
+
+
+def _owned_by(tool_id, target, root):
+    """True when target is this tool's own recorded entry."""
+    database = tools_database(root)
+    if not database.exists():
+        return False
+    store = open_record_store(database)
+    try:
+        row = store._db.execute(
+            "SELECT tool_id FROM tool_install WHERE entry = ?",
+            (str(target),),
+        ).fetchone()
+        return row is not None and row[0] == tool_id
+    finally:
+        store.close()
+
+
 def _register(
     root,
     asset,
@@ -382,7 +448,16 @@ def _register(
     database = tools_database(root)
     store = open_record_store(database)
     try:
-        store.assets.put(asset)
+        # Idempotent: an identical registration (same tool, same content)
+        # just updates the host facts below.
+        try:
+            existing = store.assets.get(asset.tool_id)
+        except RecordError:
+            existing = None
+        if existing is None:
+            store.assets.put(asset)
+        elif existing != asset:
+            raise RecordError("duplicate_tool_id")
         store._db.execute(
             "INSERT OR REPLACE INTO tool_install"
             " (tool_id, command, version, entry, description, prepared_via,"
@@ -522,6 +597,20 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", runner=subprocess.run):
             timeout=120,
             check=False,
         )
+    elif prepared_via == "aria2":
+        # Remove this tool's own exposed copy; the verified payload stays
+        # in the asset store.
+        try:
+            store = open_record_store(database)
+            entry = store._db.execute(
+                "SELECT entry FROM tool_install WHERE tool_id = ?", (tool_id,)
+            ).fetchone()
+        finally:
+            store.close()
+        if entry and entry[0]:
+            exposed = Path(entry[0])
+            if exposed.parent == bin_home():
+                exposed.unlink(missing_ok=True)
     refresh_tools(root=root)
     return {"status": "uninstalled", "tool_id": tool_id, "command": command}
 

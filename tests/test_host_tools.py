@@ -39,6 +39,7 @@ def env(tmp_path):
         "environ": {
             "PATH": str(binroot),
             "VESRYN_TOOLS_HOME": str(root),
+            "VESRYN_BIN_HOME": str(binroot / "exposed"),
         },
     }
 
