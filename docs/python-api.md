@@ -160,8 +160,11 @@ For plugins in one Python CLI environment, explicitly select pinned packages:
 
 ```python
 receipt = prepare_tool(
-    "sphinx", version="9.2.0", command="sphinx-build",
-    description="Build Sphinx documentation", allow_network=True,
+    "sphinx",
+    version="9.2.0",
+    command="sphinx-build",
+    description="Build Sphinx documentation",
+    allow_network=True,
     with_packages=("myst-parser==5.1.0", "sphinx-needs==9.1.0"),
 )
 ```
