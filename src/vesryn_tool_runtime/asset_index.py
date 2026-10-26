@@ -43,6 +43,18 @@ def native_asset_directory(root, selection):
     )
 
 
+def python_asset_directory(root, asset_id, version, digest):
+    """Python artifacts are partitioned by asset, version and publisher digest.
+
+    The wheel keeps its own file name inside the directory: uv installs a
+    local artifact by that name, so the verified bytes are the installed
+    bytes.
+    """
+    return (
+        Path(root) / "python" / ("asset-" + asset_id) / ("version-" + version) / digest
+    )
+
+
 @dataclass(frozen=True)
 class AssetFile:
     path: str

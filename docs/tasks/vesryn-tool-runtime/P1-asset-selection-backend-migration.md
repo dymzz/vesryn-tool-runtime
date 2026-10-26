@@ -20,10 +20,13 @@ Agent list:
   target shell first (reuse an entry that resolves and reports the selected
   version; report `conflict` with the existing version line instead of
   silently retargeting), installs what is missing through the real backends
-  (`uv tool install <pkg>==<version>` for Python CLIs; the existing
-  aria2 chain — source download, SHA-256 verify, safe extraction, ELF/PE
-  header check — for native binaries, selecting the release whose
-  platform/interpreter facts match this host), then registers in ONE
+  (for Python CLIs: the SELECTED artifact is fetched (or taken from the
+  asset root), its SHA-256 is checked against the publisher's digest, and
+  THAT verified file is what uv installs — `uv --no-config [--offline] tool
+  install <verified artifact>`; the existing aria2 chain — source download,
+  SHA-256 verify, safe extraction, ELF/PE header check — for native
+  binaries, selecting the release whose platform/interpreter facts match
+  this host), then registers in ONE
   operation updating both stores. Registration facts: `tool_install`
   (command, version, entry, description, prepared_via uv|aria2|external,
   reused, source_verified, registered_at) linked to the ToolAsset by
@@ -38,8 +41,8 @@ Agent list:
   `registered_not_synced` with an explicit `refresh_tools()` rebuild;
   `uninstall_tool` removes the registration (uv environments via uv's own
   uninstall; native payloads stay in the existing asset store) and
-  refreshes the list. Install failures never list the tool and never clear
-  other entries.
+  refreshes the list in the same target environment the preparation used.
+  Install failures never list the tool and never clear other entries.
 - **Strict Agent list**: `tools.json` contains exactly `command` +
   `description`; the description is this task's independent one-liner (from
   the default list or explicit input), never the retrieval summary. Only
@@ -65,7 +68,7 @@ contract. The existing ECI lock/Dagger paths are untouched.
 
 | Step | Result |
 | --- | --- |
-| `uv tool install vulture==2.16` (real, outside the package) | `+ vulture==2.16`; `vulture --version` → `vulture 2.16`; entry `C:\Users\Aurola\.local\bin\vulture` |
+| manual `uv tool install vulture==2.16` (real, outside the package; the runtime itself installs the verified artifact — finding 20) | `+ vulture==2.16`; `vulture --version` → `vulture 2.16`; entry `C:\Users\Aurola\.local\bin\vulture` |
 | `prepare_tool("vulture")` against that shell | `reused` (`reused=true`, `source_verified=false` — honest: reuse without publisher-digest verification), entry recorded, `tools.json` written |
 | `prepare_tool("hyperfine", aria2=<pinned 1.37.0>, allow_network)` | aria2 download + SHA-256 verify + safe extraction of the **windows msvc** release; `installed`, `source_verified=true`, entry = the asset-store payload path; `reused=true` on the second run (existing verified artifact reused, not re-downloaded) |
 | Read-only runs of the actual entries | `hyperfine 2.0.0`; `vulture 2.16` — versions match the registered releases |
@@ -84,8 +87,9 @@ package-manager additions, ECI lock/Dagger paths unchanged, no release.
 Handoff to Vesryn #31: `default_tools()` (candidates) vs `tools.json`
 (callable list) distinction, `user_data_root()` resolution +
 `VESRYN_TOOLS_HOME` override, `prepare_tool`/`refresh_tools`/
-`uninstall_tool` signatures, and the SessionStart boundary (read the list,
-never install).
+`uninstall_tool` signatures (all three take the target `environ`; the
+uninstall rebuilds the list in it), and the SessionStart boundary (read the
+list, never install).
 
 ## 2026-10-25 host-preparation extensions (final commit series)
 
@@ -148,12 +152,42 @@ now a directed test.
 | 17 | `tools.json` was written through a fixed temp name, so concurrent writers collided | a unique temp name in the same directory |
 | 18 | The declaration had no windows x86_64 ripgrep release although this record claimed one — `prepare_tool("ripgrep")` raised `missing_release` on this host | the official `ripgrep-15.2.0-x86_64-pc-windows-msvc.zip` release was added with the publisher digest (`71b2fef8…`) taken from the GitHub release metadata; the committed demo library was regenerated from schema+seed |
 | 19 | The `AssetSelection` construction validates that the legacy release matches the target; its `invalid_selection` was raised outside the guarded block and still leaked a raw `AssetError` | the selection is built inside the guard, so every native failure is a stable host reason |
+| 20 | The Python install handed the backend only `uv tool install <pkg>==<ver>` — no offline flag, no selected source, no digest constraint — and still recorded `source_verified=true`; a version probe cannot prove the installed artifact matches the registered SHA-256 | the SELECTED artifact is fetched (or taken from the asset root), its SHA-256 is checked against the registered digest, and THAT file is what uv installs (`uv --no-config [--offline] tool install <verified artifact>`); an unverifiable artifact is never installed |
+| 21 | The offline requirement never reached the backend: `allow_network=False` was not passed to uv at all | the offline requirement reaches uv itself as `--offline`; without network permission only an already-verified artifact in the asset root is used, a missing one is `offline_missing` |
+| 22 | A version probe that FAILED (non-zero exit) was still read as a usable entry — the output's version was enough | the probe's exit code is part of the fact: a failed probe is a `conflict` that reports the failure, and nothing is registered for it |
+| 23 | Preparing a tool twice dropped the installation ownership (`prepared_via` became `external`), so the uninstall no longer cleaned up the environment the runtime had installed | a re-preparation keeps the recorded owner and verification state of that same entry; an entry the runtime never registered stays an honest external reuse |
+| 24 | A failing uninstall still reported `uninstalled` and the registration was already deleted | the backend's result decides: a failed uninstall keeps the registration and the list entry and reports `uninstall_failed`; the registration is dropped only after the removal actually happened |
+| 25 | A delayed publisher could write a stale list over a newer one (the unique temp file only fixed the file-name collision) | the registration and the list snapshot are published under the store's existing `FileLock` coordination, and the snapshot is always rebuilt from the committed facts inside that lock |
+| 26 | `platform=linux` was parsed as `posix` and never matched the records' `linux` | the host OS is resolved through the existing platform maps (`uv_assets.host_platform`), so `linux`/`win32`/`darwin` and the record vocabulary all resolve to `linux`/`windows`/`macos` |
+| 27 | The Python artifact's location was decided inside `host_tools.py`, so the asset root had two layout conventions, and this record claimed a host path (`tool-assets\python\...`) that does not exist on this host | the layout lives with the other asset-root layouts (`asset_index.python_asset_directory`, next to `native_asset_directory`): asset, version and publisher digest, with the wheel's own file name inside it, because uv installs a local artifact by that name; this record states the real path |
+| 28 | The digest check had no directed test, and the one test that reached it read the HOST's real asset root — it would have failed as soon as the host cached an artifact, and the corrupt/mismatching paths were untested | the check is hermetic (the asset root is pointed at a temp dir), and the corrupt cached copy and the mismatching download are directed tests: neither is ever installed |
+| 29 | `uninstall_tool` rebuilt the list in the HOST's shell: a tool that only resolves in the target shell was dropped from the shared list, so uninstalling one tool silently emptied the list | the uninstall takes the target environment and rebuilds the list in it; a directed test uninstalls one of two target-only tools and keeps the other listed |
+| 30 | The lock-coordinated publication left the old `_write_tools_json` behind: dead code, and a trap — it called `refresh_tools`, which takes the same lock, so calling it from inside the locked publication would have waited for itself | removed |
+| 31 | The artifact download wrote through a fixed `<name>.part` file: two concurrent downloads of the same artifact wrote into one file, the bytes interleaved and both verifications failed | a unique temp name in the same directory (the pattern the shared list already uses), and the partial file is removed on every failure path |
 
-Verification after the fixes: `tests/test_host_tools.py` 24 passed; full suite
-193 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
+Verification after the fixes: `tests/test_host_tools.py` 35 passed; full suite
+204 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
 on this Windows host); `ruff check` and `ruff format --check` clean; the built
 wheel ships `vesryn_tool_runtime/data/default-tools.json` and
 `default_tools()` resolves it from the installed layout.
+
+### The two local stores stay what they are
+
+The user data root is `%LOCALAPPDATA%\vesryn\data` (`$XDG_DATA_HOME|~/.local/share/vesryn/data` elsewhere), and it holds exactly two things:
+
+- `tools.sqlite3` — the registration facts: which tool, which version, which
+  entry, who owns the installation, whether the source was verified;
+- `tools.json` — the Agent-facing list: strictly `command` + a short
+  `description`, sorted and deduplicated. This is the file a consumer hook
+  mounts at SessionStart; it is NOT the registry and must not be treated as
+  one.
+
+Verified artifacts (the fetched Python wheels) live in the asset root
+(`%LOCALAPPDATA%\vesryn\tool-assets` on Windows), never in the user data root,
+so the list is never confused with the installation facts. A wheel sits at
+`<asset root>\python\asset-<tool_id>\version-<version>\<publisher digest>\<wheel
+file name>` — the digest is the directory, the wheel keeps its own name, and
+only those bytes are ever handed to the installer.
 
 The host registry was checked read-only: all 15 registrations still resolve to
 their recorded artifacts, so the stricter list rule keeps the current nine

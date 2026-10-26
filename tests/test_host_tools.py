@@ -122,11 +122,21 @@ def test_version_conflict_is_reported_not_overwritten(env):
     assert not tools_json(env["root"]).exists()
 
 
-def test_missing_python_cli_installed_via_uv_and_registered(env):
+def test_missing_python_cli_installed_via_uv_and_registered(env, monkeypatch):
+    from vesryn_tool_runtime import host_tools
+
     calls = []
+    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+
+    def fake_artifact(asset, release, **kwargs):
+        return artifact
+
+    monkeypatch.setattr(host_tools, "_verified_artifact", fake_artifact)
 
     def installing_uv(argv, **kwargs):
-        if len(argv) >= 3 and argv[1] == "tool":
+        if "tool" in argv:
             calls.append(argv)
             # The install makes the command resolvable.
             make_command(env["bin"], "vulture", "vulture 2.16")
@@ -142,10 +152,396 @@ def test_missing_python_cli_installed_via_uv_and_registered(env):
     )
     assert outcome["status"] == "installed"
     assert outcome["source_verified"] is True
-    assert calls and calls[0][1:4] == ["tool", "install", "vulture==2.16"]
+    # The backend receives the SELECTED artifact, not a bare name==version.
+    assert calls and calls[0][-3:] == ["tool", "install", str(artifact)]
     assert read_json(tools_json(env["root"])) == [
         {"command": "vulture", "description": "检测 Python 无用代码"}
     ]
+
+
+def test_the_offline_requirement_reaches_the_backend(env, monkeypatch):
+    """allow_network=False must reach uv itself, not just the runtime."""
+    from vesryn_tool_runtime import host_tools
+
+    calls = []
+    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+    monkeypatch.setattr(
+        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+    )
+
+    def installing_uv(argv, **kwargs):
+        if "tool" in argv:
+            calls.append(argv)
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+        allow_network=False,
+    )
+    assert calls and "--offline" in calls[0]
+
+
+def test_the_selected_artifact_is_digest_checked_before_the_install(
+    env, monkeypatch, tmp_path
+):
+    """A cached artifact whose digest does not match is never installed."""
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    )
+    release = next(item for item in asset.versions if item.version == "2.16")
+    calls = []
+    monkeypatch.setattr(
+        host_tools,
+        "_uv_install",
+        lambda *args, **kwargs: calls.append(args) or None,
+    )
+    # A hermetic asset root: the host's own asset store is never consulted.
+    environ = {"VESRYN_TOOL_ASSETS": str(tmp_path / "assets")}
+    with pytest.raises(HostToolError, match="offline_missing"):
+        host_tools._verified_artifact(
+            asset, release, allow_network=False, environ=environ
+        )
+    assert calls == []
+
+
+def _synthetic_release(digest, *, version="2.16", name="vulture-2.16-py3-none-any.whl"):
+    """A release whose publisher digest this test controls."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        version=version,
+        digest=digest,
+        source="https://files.pythonhosted.org/packages/aa/bb/" + name,
+    )
+
+
+def test_a_verified_artifact_in_the_asset_root_is_reused_offline(tmp_path):
+    """Offline preparation uses the already-verified copy, without network."""
+    import hashlib
+
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    )
+    payload = b"the verified wheel bytes"
+    digest = hashlib.sha256(payload).hexdigest()
+    release = _synthetic_release(digest)
+    assets = tmp_path / "assets"
+    cached = (
+        assets
+        / "python"
+        / "asset-vulture"
+        / "version-2.16"
+        / digest
+        / "vulture-2.16-py3-none-any.whl"
+    )
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(payload)
+
+    path = host_tools._verified_artifact(
+        asset,
+        release,
+        allow_network=False,
+        environ={"VESRYN_TOOL_ASSETS": str(assets)},
+    )
+    assert path == cached
+    assert path.read_bytes() == payload
+
+
+def test_a_cached_artifact_with_the_wrong_digest_is_never_installed(tmp_path):
+    """A corrupt cached copy is dropped, not installed and not reused."""
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    )
+    digest = "0" * 64
+    release = _synthetic_release(digest)
+    assets = tmp_path / "assets"
+    corrupt = (
+        assets
+        / "python"
+        / "asset-vulture"
+        / "version-2.16"
+        / digest
+        / "vulture-2.16-py3-none-any.whl"
+    )
+    corrupt.parent.mkdir(parents=True)
+    corrupt.write_bytes(b"not the declared artifact")
+
+    with pytest.raises(HostToolError, match="offline_missing"):
+        host_tools._verified_artifact(
+            asset,
+            release,
+            allow_network=False,
+            environ={"VESRYN_TOOL_ASSETS": str(assets)},
+        )
+    # The corrupt copy is gone: it is never installed and never reused.
+    assert not corrupt.exists()
+
+
+def test_a_downloaded_artifact_with_the_wrong_digest_is_never_installed(
+    tmp_path, monkeypatch
+):
+    """A download that does not match the publisher digest is discarded."""
+    import io
+    import urllib.request
+
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    )
+    digest = "1" * 64
+    release = _synthetic_release(digest)
+    assets = tmp_path / "assets"
+
+    class Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *arguments):
+            self.close()
+            return False
+
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        lambda *arguments, **keywords: Response(b"a different artifact"),
+    )
+    with pytest.raises(HostToolError, match="artifact_mismatch"):
+        host_tools._verified_artifact(
+            asset,
+            release,
+            allow_network=True,
+            environ={"VESRYN_TOOL_ASSETS": str(assets)},
+        )
+    # Nothing was installed from it: no wheel and no partial download.
+    installed = assets / "python" / "asset-vulture" / "version-2.16" / digest
+    assert not list(installed.glob("*"))
+
+
+def test_uninstalling_one_tool_keeps_the_others_listed(env):
+    """The rebuild after an uninstall uses the SAME target environment.
+
+    A rebuild that resolved in the HOST's shell would drop every tool that
+    only exists in the target shell — uninstalling one tool would silently
+    empty the shared list.
+    """
+    make_command(env["bin"], "vulture", "vulture 2.16")
+    make_command(env["bin"], "pyright", "pyright 1.1.414")
+    prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    prepare_tool(
+        "pyright",
+        command="pyright",
+        description="Python static type checking",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    assert len(read_json(tools_json(env["root"]))) == 2
+
+    uninstall_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    entries = read_json(tools_json(env["root"]))
+    assert [item["command"] for item in entries] == ["pyright"]
+
+
+def test_a_failed_version_probe_is_not_a_reuse(env):
+    """A non-zero probe exit is a failure fact, not a version."""
+    make_command(env["bin"], "vulture", "vulture 2.16")
+
+    def failing_probe(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 42, "vulture 2.16", "")
+
+    outcome = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=failing_probe,
+    )
+    assert outcome["status"] == "conflict"
+    assert "42" in outcome["detail"]
+    # Nothing is registered and nothing is listed.
+    assert not tools_json(env["root"]).exists()
+
+
+def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
+    """A re-preparation must not drop the runtime's installation ownership."""
+    from vesryn_tool_runtime import host_tools
+
+    calls = []
+    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+    monkeypatch.setattr(
+        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+    )
+
+    def installing_uv(argv, **kwargs):
+        if "tool" in argv:
+            calls.append(argv)
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    outcome = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert outcome["status"] == "installed"
+    assert outcome["prepared_via"] == "uv"
+    # The second preparation reuses the SAME entry and keeps the owner, so
+    # the uninstall path still knows which environment it manages.
+    again = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert again["status"] == "reused"
+    assert again["prepared_via"] == "uv"
+
+
+def test_a_failed_uninstall_keeps_the_registration(env, monkeypatch):
+    """A failing backend is not a completed uninstall."""
+    from vesryn_tool_runtime import host_tools
+
+    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+    monkeypatch.setattr(
+        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+    )
+
+    def installing_uv(argv, **kwargs):
+        if "tool" in argv:
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+
+    def failing_uv(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 23, "", "refused")
+
+    with pytest.raises(HostToolError, match="uninstall_failed"):
+        uninstall_tool("vulture", root=env["root"], runner=failing_uv)
+    # The registration and the list entry are untouched.
+    assert read_json(tools_json(env["root"])) == [
+        {"command": "vulture", "description": "检测 Python 无用代码"}
+    ]
+
+
+def test_a_delayed_publisher_cannot_overwrite_a_newer_list(env):
+    """A publisher that waited for the lock publishes the CURRENT facts."""
+    import threading
+
+    from vesryn_tool_runtime import host_tools
+
+    make_command(env["bin"], "vulture", "vulture 2.16")
+    prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    make_command(env["bin"], "pyright", "pyright 1.1.414")
+
+    real_publish = host_tools._publish_list
+    started = threading.Event()
+    release = threading.Event()
+
+    def paused_publish(root, environ=None):
+        started.set()
+        release.wait(10)
+        return real_publish(root, environ)
+
+    def slow_refresh():
+        host_tools._publish_list = paused_publish
+        try:
+            host_tools.refresh_tools(root=env["root"], environ=env["environ"])
+        finally:
+            host_tools._publish_list = real_publish
+
+    worker = threading.Thread(target=slow_refresh)
+    worker.start()
+    assert started.wait(10)
+    # A newer registration and its list are published while the old
+    # publisher waits.
+    prepare_tool(
+        "pyright",
+        command="pyright",
+        description="Python static type checking",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    release.set()
+    worker.join(10)
+    entries = read_json(tools_json(env["root"]))
+    assert sorted(item["command"] for item in entries) == ["pyright", "vulture"]
+
+
+def test_a_linux_target_resolves_to_the_record_platform(env):
+    """platform=linux must speak the records' vocabulary."""
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    assert host_tools.sys_platform("linux") == "linux"
+    assert host_tools.sys_platform("win32") == "windows"
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "hyperfine"
+    )
+    # The linux release of the record is found instead of "missing_release".
+    release = host_tools._find_release(asset, "2.0.0", platform="linux")
+    assert release.platform.os == "linux"
+    assert release.platform.arch == "x86_64"
 
 
 def test_native_install_needs_pinned_backend(env):
@@ -163,12 +559,12 @@ def test_list_sync_failure_reports_registration_saved(env, monkeypatch):
     make_command(env["bin"], "vulture", "vulture 2.16")
 
     # Make the JSON location unwritable after SQLite commit succeeds.
-    def broken_refresh(root=None, environ=None):
+    def broken_publish(root, environ=None):
         raise HostToolError("list_not_written", "simulated")
 
     from vesryn_tool_runtime import host_tools
 
-    monkeypatch.setattr(host_tools, "refresh_tools", broken_refresh)
+    monkeypatch.setattr(host_tools, "_publish_list", broken_publish)
     outcome = prepare_tool(
         "vulture",
         root=env["root"],
@@ -303,12 +699,19 @@ def test_version_match_is_not_a_substring_match(env):
     assert outcome["status"] == "conflict"
 
 
-def test_install_is_verified_against_the_running_entry(env):
+def test_install_is_verified_against_the_running_entry(env, monkeypatch):
     """A same-name entry must not be registered as the selected release."""
     from vesryn_tool_runtime import host_tools
 
+    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+    monkeypatch.setattr(
+        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+    )
+
     def shadowing_uv(argv, **kwargs):
-        if len(argv) >= 3 and argv[1] == "tool":
+        if "tool" in argv:
             # The install leaves an OLDER entry first on PATH.
             make_command(env["bin"], "vulture", "vulture 2.14")
             return subprocess.CompletedProcess(argv, 0, "", "")
@@ -360,12 +763,20 @@ def test_uninstall_removes_the_exposed_copy(env, monkeypatch):
     assert not exposed.exists()
 
 
-def test_uninstall_gives_uv_the_package_name(env):
+def test_uninstall_gives_uv_the_package_name(env, monkeypatch):
     """uv removes the PACKAGE; the command may have another name."""
+    from vesryn_tool_runtime import host_tools
+
     calls = []
+    artifact = env["root"] / "artifact" / "import_linter-2.15-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+    monkeypatch.setattr(
+        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+    )
 
     def installing_uv(argv, **kwargs):
-        if len(argv) >= 3 and argv[1] == "tool":
+        if "tool" in argv:
             make_command(env["bin"], "lint-imports", "lint-imports 2.15")
             return subprocess.CompletedProcess(argv, 0, "", "")
         return run_real(argv, **kwargs)
@@ -449,8 +860,11 @@ def test_probe_reads_an_entry_in_a_path_with_spaces(tmp_path):
     binroot = tmp_path / "bin with spaces"
     binroot.mkdir()
     make_command(binroot, "vulture", "vulture 2.16")
-    entry, shown = host_tools._probe("vulture", {"PATH": str(binroot)}, run_real)
+    entry, shown, probed, _detail = host_tools._probe(
+        "vulture", {"PATH": str(binroot)}, run_real
+    )
     assert entry is not None
+    assert probed is True
     assert "2.16" in (shown or "")
 
 

@@ -30,14 +30,17 @@ import subprocess
 import tempfile
 from datetime import UTC, datetime
 from importlib.resources import files as resource_files
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from .asset_index import AssetIndex, asset_root
+from filelock import FileLock, Timeout
+
+from .asset_index import AssetIndex, asset_root, python_asset_directory
 from .assets import AssetError, AssetPolicy, AssetTarget
 from .discovery_records import RecordError, ToolAsset
 from .native_assets import Aria2NativeBackend, Aria2Source
 from .record_sources import legacy_preparation_definitions
 from .record_store import open_record_store
+from .uv_assets import host_platform
 
 DEFAULT_TOOLS_RESOURCE = "data/default-tools.json"
 
@@ -110,10 +113,9 @@ def user_data_root(environ=None, platform=None):
 
 
 def sys_platform(platform=None):
-    import sys
-
-    value = sys.platform if platform is None else platform
-    return "windows" if value.startswith("win") else "posix"
+    """The host OS in the RECORD vocabulary (windows/linux/macos)."""
+    os_name, _arch = host_platform(platform)
+    return os_name or "posix"
 
 
 def tools_database(root):
@@ -156,10 +158,15 @@ def _run_env(environ):
 
 
 def _probe(command, environ, runner):
-    """Resolve and read the entry's own version line; read-only."""
+    """Resolve and read the entry's own version line; read-only.
+
+    Returns ``(entry, output, ok, detail)``. ``ok`` is False when the probe
+    itself failed — a non-zero exit code or a runner error — so a version
+    string printed by a failing command is never read as a usable entry.
+    """
     entry = _which(command, environ)
     if entry is None:
-        return None, None
+        return None, None, False, "not resolvable in the target shell"
     if entry.lower().endswith((".bat", ".cmd")):
         # cmd.exe needs the whole line quoted, otherwise a path with
         # spaces is split into two arguments.
@@ -177,11 +184,13 @@ def _probe(command, environ, runner):
             env=_run_env(environ),
         )
     except OSError, subprocess.SubprocessError:
-        return entry, None
+        return entry, None, False, "version probe could not run"
     output = (result.stdout or "").strip()
     if not output:
         output = (result.stderr or "").strip()
-    return entry, output
+    if result.returncode != 0:
+        return entry, output, False, f"version probe exited {result.returncode}"
+    return entry, output, True, ""
 
 
 def _reported_versions(text):
@@ -316,11 +325,23 @@ def prepare_tool(
     declared_versions = {item.version for item in asset.versions}
 
     # Probe the target shell FIRST: an already-resolvable entry is reused
-    # as-is, but only when it reports the SELECTED version. A same-name
-    # entry of another version is an honest conflict — it is never
+    # as-is, but only when the probe SUCCEEDED and the entry reports the
+    # SELECTED version. A same-name entry of another version — or an entry
+    # whose version probe failed — is an honest conflict: it is never
     # overwritten and never silently registered under another version.
-    entry, shown = _probe(command, environ, runner)
+    entry, shown, probed, probe_detail = _probe(command, environ, runner)
     if entry is not None:
+        if not probed:
+            # The probe FAILED: its output is not evidence that the entry
+            # works, so nothing is registered for it.
+            return _outcome(
+                "conflict",
+                tool_id,
+                command,
+                version,
+                entry,
+                detail=probe_detail,
+            )
         reported = _reported_versions(shown)
         if version is None:
             # No explicit selection: any declared release the entry reports
@@ -337,6 +358,10 @@ def prepare_tool(
                 entry,
                 detail=f"existing entry reports: {(shown or '')[:120]}",
             )
+        # Ownership and verification stay as they were recorded: a tool the
+        # runtime installed keeps its installation owner, and a re-probe
+        # never rewrites the verification fact of that same artifact.
+        prepared_via, source_verified = _existing_ownership(asset.tool_id, entry, root)
         return _register(
             root,
             asset,
@@ -344,9 +369,9 @@ def prepare_tool(
             matched,
             entry,
             description,
-            "external",
+            prepared_via,
             reused=True,
-            source_verified=False,
+            source_verified=source_verified,
             status="reused",
             environ=environ,
         )
@@ -355,11 +380,23 @@ def prepare_tool(
     version = release.version
 
     if asset.provider == "uv":
-        _uv_install(uv, asset, release, runner)
-        entry, shown = _probe(command, environ, runner)
+        artifact = _verified_artifact(
+            asset, release, allow_network=allow_network, environ=environ
+        )
+        _uv_install(uv, asset, release, artifact, runner, allow_network=allow_network)
+        entry, shown, probed, probe_detail = _probe(command, environ, runner)
         if entry is None:
             raise HostToolError(
                 "install_incomplete", f"{command} not resolvable after uv install"
+            )
+        if not probed:
+            return _outcome(
+                "conflict",
+                tool_id,
+                command,
+                version,
+                entry,
+                detail=probe_detail,
             )
         if not _version_matches(_reported_versions(shown), version):
             # The resolved entry is not the selected release (a same-name
@@ -484,9 +521,77 @@ def prepare_tool(
     )
 
 
-def _uv_install(uv, asset, release, runner):
+def _verified_artifact(asset, release, *, allow_network, environ=None, timeout=300):
+    """The SELECTED artifact, with its registered digest actually checked.
+
+    The release pins a source URL and the publisher's SHA-256; the file that
+    is installed is exactly the file that was verified here. Without network
+    permission only an already-verified copy in the asset root is used — a
+    missing artifact is an explicit ``offline_missing``, never an unverified
+    install.
+    """
+    import hashlib
+    from urllib.error import URLError
+    from urllib.parse import urlsplit
+    from urllib.request import urlopen
+
+    environ = os.environ if environ is None else environ
+    directory = python_asset_directory(
+        asset_root(environ=_run_env(environ)),
+        asset.tool_id,
+        release.version,
+        release.digest,
+    )
+    name = PurePosixPath(urlsplit(release.source).path).name
+    if not name:
+        # A source URL without a file name names no artifact.
+        raise HostToolError("invalid_source", release.source)
+    path = directory / name
+
+    def _digest(candidate):
+        with candidate.open("rb") as stream:
+            return hashlib.file_digest(stream, "sha256").hexdigest()
+
+    if path.exists():
+        if not path.is_file():
+            raise HostToolError("invalid_source", release.source)
+        if _digest(path) == release.digest:
+            return path
+        # A corrupt cached copy is never installed and never reused.
+        path.unlink(missing_ok=True)
+    if not allow_network:
+        raise HostToolError("offline_missing", release.source)
+    directory.mkdir(parents=True, exist_ok=True)
+    # A unique temp name in the same directory: two concurrent downloads of
+    # the same artifact never write into one file.
+    handle, temporary = tempfile.mkstemp(
+        dir=directory, prefix=name + ".", suffix=".part"
+    )
+    try:
+        with (
+            os.fdopen(handle, "wb") as stream,
+            urlopen(release.source, timeout=timeout) as response,
+        ):
+            shutil.copyfileobj(response, stream)
+    except (OSError, URLError, ValueError) as error:
+        Path(temporary).unlink(missing_ok=True)
+        raise HostToolError("download_failed", str(error)) from None
+    if _digest(Path(temporary)) != release.digest:
+        Path(temporary).unlink(missing_ok=True)
+        raise HostToolError("artifact_mismatch", release.source)
+    os.replace(temporary, path)
+    return path
+
+
+def _uv_install(uv, asset, release, artifact, runner, *, allow_network):
+    """Install the verified artifact through uv's own tool environment."""
+    command = [uv, "--no-config"]
+    if not allow_network:
+        # The offline requirement reaches the backend itself.
+        command.append("--offline")
+    command += ["tool", "install", str(artifact)]
     result = runner(
-        [uv, "tool", "install", f"{asset.package or asset.tool_id}=={release.version}"],
+        command,
         stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
@@ -576,6 +681,43 @@ def _uv_package(tool_id, fallback):
     return fallback
 
 
+def _existing_ownership(tool_id, entry, root):
+    """The recorded owner and verification state of an already-registered entry.
+
+    A tool this runtime installed keeps that installation owner when it is
+    prepared again, so the uninstall path still knows what it manages. The
+    verification fact of that same artifact is not rewritten by a re-probe.
+    An entry the runtime never registered is an external reuse: no owner, no
+    upstream evidence.
+    """
+    database = tools_database(root)
+    if not database.exists():
+        return "external", False
+    store = open_record_store(database)
+    try:
+        row = store._db.execute(
+            "SELECT prepared_via, source_verified FROM tool_install"
+            " WHERE tool_id = ? AND entry = ?",
+            (tool_id, str(entry)),
+        ).fetchone()
+    finally:
+        store.close()
+    if row is None:
+        return "external", False
+    return row[0], bool(row[1])
+
+
+def _store_lock(root, timeout=120):
+    """The existing write coordination: one lock per local store.
+
+    The registration and the list snapshot it produces are published under
+    this lock, so a publisher that was delayed cannot write a stale snapshot
+    over a newer one. The lock is taken ONCE per operation — a second
+    FileLock instance on the same file would wait for itself.
+    """
+    return FileLock(str(tools_database(root)) + ".lock", timeout=timeout)
+
+
 def _register(
     root,
     asset,
@@ -591,6 +733,57 @@ def _register(
 ):
     root = Path(root)
     database = tools_database(root)
+    # The registration and the snapshot it produces are published under the
+    # store's own lock: a delayed publisher re-reads the committed facts
+    # instead of writing a stale list over a newer one.
+    try:
+        with _store_lock(root):
+            synced = _register_locked(
+                root,
+                database,
+                asset,
+                command,
+                version,
+                entry,
+                description,
+                prepared_via,
+                reused,
+                source_verified,
+                environ,
+            )
+    except Timeout:
+        raise HostToolError("store_busy", str(root)) from None
+    outcome = _outcome(
+        status,
+        asset.tool_id,
+        command,
+        version,
+        entry,
+        description=description,
+        prepared_via=prepared_via,
+        reused=reused,
+        source_verified=source_verified,
+    )
+    if not synced:
+        outcome["status"] = "registered_not_synced"
+        outcome["detail"] = "registration saved; tools.json not synced"
+    return outcome
+
+
+def _register_locked(
+    root,
+    database,
+    asset,
+    command,
+    version,
+    entry,
+    description,
+    prepared_via,
+    reused,
+    source_verified,
+    environ,
+):
+    """The registration and its snapshot, published under the store's lock."""
     store = open_record_store(database)
     try:
         # Idempotent: an identical registration (same tool, same content)
@@ -631,22 +824,11 @@ def _register(
         store._db.commit()
     finally:
         store.close()
-    synced = _write_tools_json(root, environ)
-    outcome = _outcome(
-        status,
-        asset.tool_id,
-        command,
-        version,
-        entry,
-        description=description,
-        prepared_via=prepared_via,
-        reused=reused,
-        source_verified=source_verified,
-    )
-    if not synced:
-        outcome["status"] = "registered_not_synced"
-        outcome["detail"] = "registration saved; tools.json not synced"
-    return outcome
+    try:
+        _publish_list(root, environ)
+        return True
+    except HostToolError:
+        return False
 
 
 def _outcome(
@@ -681,20 +863,15 @@ def _outcome(
     return value
 
 
-def refresh_tools(root=None, environ=None):
-    """Regenerate tools.json from the registration facts — explicit rebuild.
+def _publish_list(root, environ=None):
+    """Write the list from the committed facts; the caller holds the lock.
 
-    Only registrations whose command currently resolves in the target shell
-    AND resolves to the registered artifact are listed; a same-name entry
-    from elsewhere is not the verified tool, and an entry-not-ready tool
-    stays registered but unlisted. Returns the number of entries written; a
-    write failure raises ``HostToolError`` with ``list_not_written``.
+    The snapshot is always built from the CURRENT registrations, so a
+    publisher that was delayed publishes the facts as they are now rather
+    than the ones it read before it waited for the lock.
     """
     environ = os.environ if environ is None else environ
-    root = user_data_root(environ=environ) if root is None else Path(root)
     database = tools_database(root)
-    if not database.exists():
-        raise HostToolError("not_registered", "no local registration database")
     store = open_record_store(database)
     try:
         rows = store._db.execute(
@@ -724,14 +901,43 @@ def refresh_tools(root=None, environ=None):
     return len(entries)
 
 
-def uninstall_tool(tool_id, *, root=None, uv="uv", runner=subprocess.run):
+def refresh_tools(root=None, environ=None):
+    """Regenerate tools.json from the registration facts — explicit rebuild.
+
+    Only registrations whose command currently resolves in the target shell
+    AND resolves to the registered artifact are listed; a same-name entry
+    from elsewhere is not the verified tool, and an entry-not-ready tool
+    stays registered but unlisted. Returns the number of entries written; a
+    write failure raises ``HostToolError`` with ``list_not_written``.
+    """
+    environ = os.environ if environ is None else environ
+    root = user_data_root(environ=environ) if root is None else Path(root)
+    database = tools_database(root)
+    if not database.exists():
+        raise HostToolError("not_registered", "no local registration database")
+    try:
+        with _store_lock(root):
+            return _publish_list(root, environ)
+    except Timeout:
+        raise HostToolError("store_busy", str(root)) from None
+
+
+def uninstall_tool(tool_id, *, root=None, uv="uv", environ=None, runner=subprocess.run):
     """Remove the registration and (for uv tools) the installed environment.
+
+    The backend's own result decides: when the uninstall fails, the
+    registration and the list stay as they are and the failure is reported —
+    a partial removal is never presented as a complete uninstall.
 
     Native payloads stay in the existing asset store — this path does not
     delete verified artifacts; only this runtime's own exposure copy in the
-    exposure directory is removed. The shared list is refreshed afterwards.
+    exposure directory is removed. The shared list is refreshed afterwards,
+    in the SAME target environment the preparation used: a rebuild that
+    resolved in the host's shell would drop every tool that only exists in
+    the target shell.
     """
-    root = user_data_root() if root is None else Path(root)
+    environ = os.environ if environ is None else environ
+    root = user_data_root(environ=environ) if root is None else Path(root)
     database = tools_database(root)
     if not database.exists():
         raise HostToolError("not_registered", tool_id)
@@ -741,15 +947,16 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", runner=subprocess.run):
             "SELECT prepared_via, command, entry FROM tool_install WHERE tool_id = ?",
             (tool_id,),
         ).fetchone()
-        if row is None:
-            raise HostToolError("not_registered", tool_id)
-        prepared_via, command, entry = row
-        store._db.execute("DELETE FROM tool_install WHERE tool_id = ?", (tool_id,))
-        store._db.commit()
     finally:
         store.close()
+    if row is None:
+        raise HostToolError("not_registered", tool_id)
+    prepared_via, command, entry = row
+
+    # The removal happens BEFORE the registration is dropped, so a failed
+    # removal keeps the registration and the list entry.
     if prepared_via == "uv":
-        runner(
+        result = runner(
             [uv, "tool", "uninstall", _uv_package(tool_id, command)],
             stdin=subprocess.DEVNULL,
             capture_output=True,
@@ -757,23 +964,30 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", runner=subprocess.run):
             timeout=120,
             check=False,
         )
+        if result.returncode != 0:
+            raise HostToolError(
+                "uninstall_failed",
+                (result.stderr or result.stdout or "")[:300],
+            )
     elif prepared_via == "aria2" and entry:
         # Remove this tool's own exposed copy; the verified payload stays
         # in the asset store.
         exposed = Path(entry)
         if _is_exposed_copy(exposed):
-            exposed.unlink(missing_ok=True)
-    refresh_tools(root=root)
+            try:
+                exposed.unlink(missing_ok=True)
+            except OSError as error:
+                raise HostToolError("uninstall_failed", str(error)) from None
+
+    with _store_lock(root):
+        store = open_record_store(database)
+        try:
+            store._db.execute("DELETE FROM tool_install WHERE tool_id = ?", (tool_id,))
+            store._db.commit()
+        finally:
+            store.close()
+        _publish_list(root, environ)
     return {"status": "uninstalled", "tool_id": tool_id, "command": command}
-
-
-def _write_tools_json(root, environ=None):
-    """Snapshot sync from the committed registrations; True when written."""
-    try:
-        refresh_tools(root=root, environ=environ)
-        return True
-    except HostToolError:
-        return False
 
 
 def _atomic_write_json(path, entries):
