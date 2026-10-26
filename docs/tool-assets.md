@@ -153,16 +153,24 @@ does not verify all installed distribution bytes or replace publisher provenance
 
 ### Main-artifact provenance
 
+```{spec} Verify the installed main artifact against its selected release
+:id: SPEC_TR_MAIN_ARTIFACT_PROOF
+
 The proof fields record the source URL and SHA256 actually verified and used
 for the installation; they are both present or both NULL. The `prepare_tool`
 result's `source_verified` compares that proof with the selected release's
 version, source and digest for the target. It is computed, not a stored boolean,
 and does not depend on the installation owner.
+```
 
 Inspection and an unchanged uv environment preserve existing main-artifact proof,
 including an unknown proof. If an explicit plugin preparation needs to establish
 new main provenance, it requests `--reinstall-package <main>` from the already
 verified wheel. It does not globally force or reinstall every dependency.
+
+```{adr} Keep installation provenance separate from mutable declarations
+:id: ADR_TR_PERSIST_INSTALLATION_PROOF
+:satisfies: SPEC_TR_MAIN_ARTIFACT_PROOF
 
 Caching another artifact does not prove it installed the current entry.
 Removing a download cache does not erase an installation receipt. A changed
@@ -171,6 +179,7 @@ the actual installed source. This records installation provenance, not a
 revalidation of executable files separately modified outside the runtime.
 `tools.json` remains a list of callable commands, not source-verification or
 execution-permission decisions.
+```
 
 See [the Schema upgrade boundary](discovery-contracts.md#migration-boundary-explicit)
 for existing registration stores.
