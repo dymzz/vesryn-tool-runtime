@@ -27,6 +27,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import UTC, datetime
 from importlib.resources import files as resource_files
@@ -383,7 +384,23 @@ def prepare_tool(
         artifact = _verified_artifact(
             asset, release, allow_network=allow_network, environ=environ
         )
-        _uv_install(uv, asset, release, artifact, runner, allow_network=allow_network)
+        interpreter = _tool_interpreter(artifact.name, environ)
+        if interpreter is None:
+            # No interpreter on this host can load the artifact's extensions.
+            raise HostToolError(
+                "interpreter_unavailable",
+                f"no GIL-enabled Python {sys.version_info.major}."
+                f"{sys.version_info.minor} for {artifact.name}",
+            )
+        _uv_install(
+            uv,
+            asset,
+            release,
+            artifact,
+            runner,
+            allow_network=allow_network,
+            interpreter=interpreter,
+        )
         entry, shown, probed, probe_detail = _probe(command, environ, runner)
         if entry is None:
             raise HostToolError(
@@ -583,13 +600,97 @@ def _verified_artifact(asset, release, *, allow_network, environ=None, timeout=3
     return path
 
 
-def _uv_install(uv, asset, release, artifact, runner, *, allow_network):
+def _interpreter_facts(executable):
+    """(major, minor, gil_enabled) of an interpreter, or None."""
+    try:
+        result = subprocess.run(
+            [
+                str(executable),
+                "-c",
+                (
+                    "import sys; print(sys.version_info[0], sys.version_info[1],"
+                    " getattr(sys, '_is_gil_enabled', lambda: True)())"
+                ),
+            ],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except OSError, subprocess.SubprocessError:
+        return None
+    parts = (result.stdout or "").split()
+    if result.returncode != 0 or len(parts) != 3:
+        return None
+    try:
+        return int(parts[0]), int(parts[1]), parts[2] == "True"
+    except ValueError:
+        return None
+
+
+def _pure_python_artifact(name):
+    """True when the wheel carries no compiled extension."""
+    from packaging.utils import parse_wheel_filename
+
+    try:
+        _, _, _, tags = parse_wheel_filename(name)
+    except ValueError:
+        return False
+    return all(tag.platform == "any" and tag.abi == "none" for tag in tags)
+
+
+def _path_interpreters(environ):
+    """The target PATH's interpreters, in PATH order."""
+    version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    names = ("python.exe", "python3.exe", f"python{version}.exe", "python3", "python")
+    for entry in (environ.get("PATH") or "").split(os.pathsep):
+        if not entry:
+            continue
+        for name in names:
+            candidate = Path(entry) / name
+            if candidate.is_file():
+                yield str(candidate)
+
+
+def _tool_interpreter(name, environ):
+    """The interpreter that builds the tool environment — named, not guessed.
+
+    uv picks an interpreter on its own when none is named, and on a
+    free-threaded host that pick cannot load the GIL-bound extensions of a
+    compiled wheel: the install then fails with "the wheel was built for
+    the stable ABI, which requires a GIL-enabled interpreter". The
+    interpreter is therefore named — the running one when it can load the
+    artifact, otherwise a GIL-enabled interpreter of the SAME version from
+    the target PATH. None means no interpreter can load it.
+    """
+    running = sys.executable
+    facts = _interpreter_facts(running)
+    if facts is None:
+        return running
+    if facts[2] or _pure_python_artifact(name):
+        return running
+    for candidate in _path_interpreters(environ):
+        other = _interpreter_facts(candidate)
+        if other is None or other[:2] != facts[:2] or not other[2]:
+            continue
+        return candidate
+    return None
+
+
+def _uv_install(
+    uv, asset, release, artifact, runner, *, allow_network, interpreter=None
+):
     """Install the verified artifact through uv's own tool environment."""
     command = [uv, "--no-config"]
     if not allow_network:
         # The offline requirement reaches the backend itself.
         command.append("--offline")
-    command += ["tool", "install", str(artifact)]
+    command += ["tool", "install"]
+    if interpreter:
+        # The interpreter is named, not guessed by the backend.
+        command += ["--python", str(interpreter)]
+    command += [str(artifact)]
     result = runner(
         command,
         stdin=subprocess.DEVNULL,

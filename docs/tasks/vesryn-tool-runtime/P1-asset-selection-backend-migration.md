@@ -164,9 +164,11 @@ now a directed test.
 | 29 | `uninstall_tool` rebuilt the list in the HOST's shell: a tool that only resolves in the target shell was dropped from the shared list, so uninstalling one tool silently emptied the list | the uninstall takes the target environment and rebuilds the list in it; a directed test uninstalls one of two target-only tools and keeps the other listed |
 | 30 | The lock-coordinated publication left the old `_write_tools_json` behind: dead code, and a trap — it called `refresh_tools`, which takes the same lock, so calling it from inside the locked publication would have waited for itself | removed |
 | 31 | The artifact download wrote through a fixed `<name>.part` file: two concurrent downloads of the same artifact wrote into one file, the bytes interleaved and both verifications failed | a unique temp name in the same directory (the pattern the shared list already uses), and the partial file is removed on every failure path |
+| 32 | The declaration's deptry Windows release carried `abi: gnu` — copied from the manylinux row — so the host (windows → msvc) could not select it at all; it was the only Windows row in the whole declaration with a glibc ABI | the row states `abi: msvc`, like the other Windows wheels (py-spy, tach); the publisher digest was re-verified against the publisher's own bytes before the correction, and the committed demo library was rebuilt from schema+seed |
+| 33 | The tool environment's interpreter was left to the backend: uv picks one on its own, and on a free-threaded host that pick cannot load the stable-ABI (abi3) wheels publishers ship — the install failed with "the wheel was built for the stable ABI, which requires a GIL-enabled interpreter" | the interpreter is NAMED: the running one when it can load the artifact, otherwise a GIL-enabled interpreter of the same version from the target PATH; a host with neither reports `interpreter_unavailable` instead of a backend dump |
 
-Verification after the fixes: `tests/test_host_tools.py` 35 passed; full suite
-204 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
+Verification after the fixes: `tests/test_host_tools.py` 38 passed; full suite
+207 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
 on this Windows host); `ruff check` and `ruff format --check` clean; the built
 wheel ships `vesryn_tool_runtime/data/default-tools.json` and
 `default_tools()` resolves it from the installed layout.
@@ -194,3 +196,27 @@ their recorded artifacts, so the stricter list rule keeps the current nine
 entries. A `refresh_tools()` run on the host adds the six native entries
 (`actionlint`, `hyperfine`, `osv-scanner`, `shellcheck`, `trivy`, `zizmor`)
 that are registered and now exposed through `~/.vesryn/bin`.
+
+### 2026-10-26 the host list, brought up to date
+
+The host's `tools.json` was rebuilt from the host's own registrations with an
+explicit `refresh_tools()`: the list went from nine entries to the 15 that
+resolve, and then to 16 after `deptry` was prepared. Read-only checks on the
+host: all 16 registrations resolve to their recorded artifacts, the six native
+entries resolve to their exposure copies in `~/.vesryn/bin`, and `rg` resolves
+to the owner's own `D:\Tools\rg` — an honest external reuse, recorded as
+`prepared_via=external`, `source_verified=0`.
+
+`deptry 0.25.1` was prepared through the runtime on this host: the selected
+Windows wheel was fetched, its SHA-256 checked against the publisher's digest,
+and that verified file installed — `installed`, `source_verified=true`, entry
+`~\.local\bin\deptry.EXE`, and `deptry --version` → `deptry 0.25.1`. The
+install needed the interpreter to be NAMED (finding 33): this host's project
+interpreter is a free-threaded CPython 3.14 (`cp314t`), which cannot load the
+wheel's stable ABI.
+
+`pylint` was NOT prepared, and the runtime said why instead of forcing it: the
+host already resolves `pylint` to `D:\SDE\Python\Python314\Scripts\pylint.EXE`,
+which reports 4.1.2, while the declaration offers 4.1.3. That is an honest
+`conflict` — the existing entry is never overwritten and never registered
+under another version.

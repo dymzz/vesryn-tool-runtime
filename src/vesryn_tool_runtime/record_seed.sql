@@ -653,12 +653,13 @@ VALUES
    'e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6');
 
 -- deptry windows x86_64 wheel: verified against official PyPI metadata
--- on 2026-10-25 (issue #33 host preparation on a windows host).
+-- on 2026-10-25 (issue #33 host preparation on a windows host). The wheel is
+-- a win_amd64 build: it states the MSVC runtime, not a glibc ABI.
 INSERT INTO tool_release
   (tool_id, version, platform_os, platform_arch, platform_abi,
    platform_python, source, digest_type, digest)
 VALUES
-  ('deptry', '0.25.1', 'windows', 'x86_64', 'gnu', '>=3.10',
+  ('deptry', '0.25.1', 'windows', 'x86_64', 'msvc', '>=3.10',
    'https://files.pythonhosted.org/packages/7a/6a/3f82f7a06217778282bc4456af1b4ffb3bc4b2c8e7891d00e8323f9ad0b8/deptry-0.25.1-cp310-abi3-win_amd64.whl',
    'sha256',
    'b59a560cb7dffb21832a98bb80d33d614cfb5630ea36ce21833eabf4eae3df99');

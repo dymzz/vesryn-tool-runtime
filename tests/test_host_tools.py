@@ -153,7 +153,12 @@ def test_missing_python_cli_installed_via_uv_and_registered(env, monkeypatch):
     assert outcome["status"] == "installed"
     assert outcome["source_verified"] is True
     # The backend receives the SELECTED artifact, not a bare name==version.
-    assert calls and calls[0][-3:] == ["tool", "install", str(artifact)]
+    assert calls
+    argv = calls[0]
+    index = argv.index("tool")
+    assert argv[index : index + 2] == ["tool", "install"]
+    assert argv[-1] == str(artifact)
+    assert "vulture==2.16" not in argv
     assert read_json(tools_json(env["root"])) == [
         {"command": "vulture", "description": "检测 Python 无用代码"}
     ]
@@ -186,6 +191,92 @@ def test_the_offline_requirement_reaches_the_backend(env, monkeypatch):
         allow_network=False,
     )
     assert calls and "--offline" in calls[0]
+
+
+def test_the_tool_interpreter_is_stated_not_guessed(env, monkeypatch):
+    """uv must be told which interpreter builds the tool environment.
+
+    Left to itself, uv picks one — on a free-threaded host that pick cannot
+    load the stable-ABI (abi3) wheels publishers ship, and the install
+    fails. The runtime names the interpreter instead.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    calls = []
+    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+    monkeypatch.setattr(
+        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+    )
+
+    def installing_uv(argv, **kwargs):
+        if "tool" in argv:
+            calls.append(argv)
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert calls
+    argv = calls[0]
+    assert "--python" in argv
+    named = argv[argv.index("--python") + 1]
+    # A pure-python artifact loads on any interpreter: the running one.
+    assert named == sys.executable
+
+
+def test_a_compiled_wheel_names_a_gil_enabled_interpreter(env, monkeypatch):
+    """A compiled wheel cannot be loaded by a free-threaded interpreter.
+
+    The runtime names a GIL-enabled interpreter of the same version instead
+    of letting the backend pick one — uv's own version request does not
+    exclude the free-threaded build.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    other = env["bin"] / "python.exe"
+    other.write_bytes(b"interpreter")
+
+    facts = {
+        sys.executable: (3, 14, False),
+        str(other): (3, 14, True),
+    }
+    monkeypatch.setattr(
+        host_tools, "_interpreter_facts", lambda executable: facts.get(str(executable))
+    )
+    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [str(other)])
+
+    # A compiled wheel (a platform-specific one) needs the GIL-enabled build.
+    assert host_tools._tool_interpreter(
+        "deptry-0.25.1-cp310-abi3-win_amd64.whl", env["environ"]
+    ) == str(other)
+    # A pure-python wheel loads on the running interpreter.
+    assert (
+        host_tools._tool_interpreter("vulture-2.16-py3-none-any.whl", env["environ"])
+        == sys.executable
+    )
+
+
+def test_no_interpreter_that_can_load_the_wheel_is_a_stable_reason(env, monkeypatch):
+    """A host without a GIL-enabled interpreter reports a stable reason."""
+    from vesryn_tool_runtime import host_tools
+
+    monkeypatch.setattr(
+        host_tools, "_interpreter_facts", lambda executable: (3, 14, False)
+    )
+    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [])
+    assert (
+        host_tools._tool_interpreter(
+            "deptry-0.25.1-cp310-abi3-win_amd64.whl", env["environ"]
+        )
+        is None
+    )
 
 
 def test_the_selected_artifact_is_digest_checked_before_the_install(
