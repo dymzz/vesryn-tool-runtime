@@ -149,9 +149,29 @@ tool = catalog.resolve("ripgrep")
 from vesryn_tool_runtime import prepare_tool, refresh_tools
 
 # Explicitly prepare a tool declared in the seed records
-receipt = prepare_tool("pyright", version="1.1.414")
+receipt = prepare_tool("vulture", version="2.16", allow_network=True)
 
 if receipt["status"] == "registered_not_synced":
     # Recover JSON manifest synchronization
     refresh_tools()
 ```
+
+For plugins in one Python CLI environment, explicitly select pinned packages:
+
+```python
+receipt = prepare_tool(
+    "sphinx", version="9.2.0", command="sphinx-build",
+    description="Build Sphinx documentation", allow_network=True,
+    with_packages=("myst-parser==5.1.0", "sphinx-needs==9.1.0"),
+)
+```
+
+`with_packages=None` keeps legacy behavior; explicit `()` removes additional
+requests through uv's own reconciliation. A same-version CLI is not a plugin
+environment hit: the complete request, actual tool Python/distributions and
+dependency consistency are checked. Explicit-package results carry an
+`environment` evidence document; its `python` is the interpreter to use for
+extension imports. `source_verified` remains proof of the declared main artifact,
+not an environment-wide supply-chain statement. See
+[Python CLI plugin preparation](tool-assets.md#python-cli-plugins-in-the-same-tool-environment)
+for ownership, failure and reuse semantics.

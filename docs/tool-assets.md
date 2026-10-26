@@ -59,7 +59,8 @@ Exported from `vesryn_tool_runtime`:
 default_tools() -> tuple[dict, ...]
 prepare_tool(tool_id, *, version=None, command=None, description=None,
              root=None, allow_network=False, platform=None, uv="uv",
-             aria2=None, environ=None, runner=subprocess.run) -> dict
+             aria2=None, environ=None, runner=subprocess.run,
+             with_packages=None) -> dict
 refresh_tools(root=None, environ=None) -> int
 uninstall_tool(tool_id, *, root=None, uv="uv", environ=None,
                runner=subprocess.run) -> dict
@@ -91,11 +92,75 @@ and Sphinx-Needs are extensions of that tool environment, not independent
 Agent CLI registrations. A verified Sphinx wheel alone does not establish
 that either extension or all transitive dependencies are installed or verified.
 
+### Python CLI plugins in the same tool environment
+
+Pass an explicit `with_packages` list/tuple of `name==version` requirements
+to prepare plugins alongside a uv-managed main tool. Runtime normalizes package
+names and order, deduplicates equal pins and rejects conflicting pins, main-package
+overrides, ranges, wildcards, markers, extras, URLs and paths before preparation.
+Explicit package requests apply only to `provider="uv"`.
+
+`with_packages=None` preserves the existing behavior for callers that do not
+manage plugins. Explicit `()` asks uv to reconcile an empty additional-request
+set; it is distinct from leaving plugin configuration alone. A package that is
+still needed transitively can remain in the environment.
+
+```python
+from vesryn_tool_runtime import prepare_tool
+
+receipt = prepare_tool(
+    "sphinx", version="9.2.0", command="sphinx-build",
+    description="Build the project's Sphinx documentation",
+    with_packages=("myst-parser==5.1.0", "sphinx-needs==9.1.0"),
+    allow_network=True,
+)
+```
+
+The main wheel still comes from the bundled declaration and existing SHA-256
+verification path. Runtime passes it and the complete additional request to
+`uv tool install --python ... --with ...`; uv resolves transitive dependencies
+and manages its own environment. Plugins do not receive independent Agent entries.
+Use explicit package requests on subsequent calls whenever the plugin set matters.
+
+A matching CLI version alone cannot establish plugin reuse. Explicit requests
+also require uv's recorded complete additional set, that tool environment's actual
+distribution versions and a successful `uv pip check`. A changed/missing set is
+reconciled by uv; an unidentifiable or shadowing external command is `conflict`.
+After reconciliation, Runtime repeats those checks before registration. Failed uv
+operations remain `uv_install_failed`; missing/inconsistent evidence is
+`environment_unverified`, never a successful registration. `installed` means the
+requested configuration was prepared, not that every package was downloaded again.
+
+Explicit-package outcomes include an `environment` document: `python`, `prefix`,
+`python_version`, canonical `with_packages`, sorted `packages` (`name`/`version`),
+and `dependencies_consistent`. These are observed through the tool's own Python
+with `-I -B` and uv's public interfaces. They are returned evidence, not another
+environment registry or an inventory hash. SQLite's existing installation facts
+and the strict `tools.json` command/description list retain their shapes.
+
+The public tool text view is verified with uv 0.12.23. Unsupported output or a
+Python reporting another prefix is refused; Runtime does not parse private
+`uv-receipt.toml` or package-cache layouts. The caller's effective `environ`,
+including `UV_TOOL_DIR`, `UV_TOOL_BIN_DIR` and `UV_CACHE_DIR`, reaches the uv
+processes, allowing fully isolated roots without changing global configuration.
+
+Check extensions with `receipt["environment"]["python"]`, rather than project
+Python: for this example it must import `sphinx`, `myst_parser` and `sphinx_needs`
+and report the selected distribution versions. A package inventory/import probe
+does not verify all installed distribution bytes or replace publisher provenance.
+
+### Main-artifact provenance
+
 The proof fields record the source URL and SHA256 actually verified and used
 for the installation; they are both present or both NULL. The `prepare_tool`
 result's `source_verified` compares that proof with the selected release's
 version, source and digest for the target. It is computed, not a stored boolean,
 and does not depend on the installation owner.
+
+Inspection and an unchanged uv environment preserve existing main-artifact proof,
+including an unknown proof. If an explicit plugin preparation needs to establish
+new main provenance, it requests `--reinstall-package <main>` from the already
+verified wheel. It does not globally force or reinstall every dependency.
 
 Caching another artifact does not prove it installed the current entry.
 Removing a download cache does not erase an installation receipt. A changed
