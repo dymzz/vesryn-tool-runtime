@@ -52,6 +52,7 @@ EXPECTED_TOOLS = {
     "memray": ("uv", 2),
     "py-spy": ("uv", 2),
     "tach": ("uv", 2),
+    "sphinx": ("uv", 1),
 }
 VULTURE_214_URL = (
     "https://files.pythonhosted.org/packages/a0/56/0cc15b8ff2613c1d5c3"
@@ -246,6 +247,34 @@ def test_legacy_view_serves_the_old_preparation_callers():
     assert all(r.backend == "aria2" for r in hyperfine.releases)
     semgrep = definitions["semgrep"]
     assert all(r.backend == "oci" for r in semgrep.releases)
+
+
+def test_bundled_sphinx_is_one_pinned_main_cli_not_standalone_plugins():
+    records = bundled_records()
+    assets = {
+        record.tool_id: record for record in records if isinstance(record, ToolAsset)
+    }
+    assert "sphinx" in assets
+    assert "myst-parser" not in assets and "sphinx-needs" not in assets
+    tool = compose_catalog(records).asset("sphinx")
+    assert (tool.provider, tool.package, tool.entrypoint) == (
+        "uv",
+        "sphinx",
+        "sphinx-build",
+    )
+    (release,) = tool.versions
+    assert release.version == "9.2.0"
+    assert release.platform is None and release.python == ">=3.13"
+    assert (
+        release.digest
+        == "4c3ec13b612712c0d3ce4cbdd9e3eb91e68577e07a8e31f32f21cf178453578c"
+    )
+    store = open_record_store(":memory:")
+    try:
+        store.put_records(records)
+        assert store.assets.get("sphinx") == tool
+    finally:
+        store.close()
 
 
 def test_composed_catalog_type_and_missing_errors():

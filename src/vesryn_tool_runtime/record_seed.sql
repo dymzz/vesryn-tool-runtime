@@ -663,3 +663,17 @@ VALUES
    'https://files.pythonhosted.org/packages/7a/6a/3f82f7a06217778282bc4456af1b4ffb3bc4b2c8e7891d00e8323f9ad0b8/deptry-0.25.1-cp310-abi3-win_amd64.whl',
    'sha256',
    'b59a560cb7dffb21832a98bb80d33d614cfb5630ea36ce21833eabf4eae3df99');
+
+-- Sphinx is the CLI; MyST-Parser and Sphinx-Needs are plugins in its uv
+-- environment, not separate Agent commands (issue #46 A).
+INSERT INTO tool_asset (tool_id, name, provider, package, entrypoint) VALUES
+  ('sphinx', 'Sphinx', 'uv', 'sphinx', 'sphinx-build');
+
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('sphinx', '9.2.0', NULL, NULL, NULL, '>=3.13',
+   'https://files.pythonhosted.org/packages/c4/28/a0c50761cd215b7042f4bc617a6bc5c0cd7be62f75bc908e169e28a4d21e/sphinx-9.2.0-py3-none-any.whl',
+   'sha256',
+   '4c3ec13b612712c0d3ce4cbdd9e3eb91e68577e07a8e31f32f21cf178453578c');

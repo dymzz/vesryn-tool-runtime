@@ -85,6 +85,12 @@ Verified artifacts (such as fetched Python wheels) live in the asset root (`%LOC
 
 ### Installation verification
 
+The bundled `sphinx` asset declares Sphinx 9.2.0 (`sphinx-build`, Python
+`>=3.13`) and its official universal wheel's source and SHA-256. MyST-Parser
+and Sphinx-Needs are extensions of that tool environment, not independent
+Agent CLI registrations. A verified Sphinx wheel alone does not establish
+that either extension or all transitive dependencies are installed or verified.
+
 The proof fields record the source URL and SHA256 actually verified and used
 for the installation; they are both present or both NULL. The `prepare_tool`
 result's `source_verified` compares that proof with the selected release's
