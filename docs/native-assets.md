@@ -178,5 +178,4 @@ Importing a snapshot does not mount a cross-repository writable cache. Native lo
 Installed state says nothing about other runners. No Dagger SDK becomes a base
 dependency, and no scan, benchmark or new execution/transport protocol is introduced.
 
-Directed results and their limits are in the
-[issue #8 delivery record](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md).
+Directed results and their limits are recorded in the issue #8 delivery history.

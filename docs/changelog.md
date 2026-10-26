@@ -8,14 +8,14 @@
   retain consumer-owned workflow associations and recovery.
 - Add independent single/batch invocation and explicit EventSink observations.
 - Integrate both consumers through compatibility exports and delegated dispatch.
-- No formal release or tag is created. Read [readiness](delivery/tool-runtime-0.1.0.md)
+- No formal release or tag is created. Read readiness assessment
   for verified paths and remaining publication work.
 
 ## 0.2.0 — local tool assets
 
 - Integrate A/B/C through the same Catalog, receipt and index, with independent
   multi-version uv environments and verified native payloads. See the
-  [joint acceptance and release assessment](tasks/vesryn-tool-runtime/P0-local-tool-assets.md).
+  joint acceptance and release assessment.
 - Require current AssetPolicy on uv lock/preparation/inspection/command, retain a
   published environment's frozen lock and reuse it without rebuilding after cache
   removal. This refines the unreleased #7 prototype; released 0.1 interfaces and
@@ -25,20 +25,20 @@
   verified offline reuse, safe staged extraction and immutable version directories.
   Reuse the common receipt/index and existing File/Directory transport; include
   reviewed OSV/Hyperfine definitions. See [native assets](native-assets.md) and
-  [issue #8 delivery](tasks/vesryn-tool-runtime/P0-aria2-native-assets.md).
+  issue #8 delivery.
 
 - Add independent CLI asset definitions/target and version-policy resolution to the
   existing Catalog, plus frozen selection snapshots and a shared, integrity-checked
   local backend receipt/index boundary. Preserve tool/Binding hashes and admission;
   no downloader or installer is introduced. See [asset contracts](tool-assets.md)
-  and [issue #6 delivery](tasks/vesryn-tool-runtime/P0-tool-asset-resolution.md).
+  and issue #6 delivery.
 
 - Widen the Log requirement to the compatible `>=0.1.0,<0.2.0` range while preserving the
   existing immutable development source and lock baseline. Tool contracts and Schema 1 are
   unchanged, and the delivered 0.1.0 wheel keeps its recorded SHA-256 until a new wheel is
   built. The binding and admission compatibility conclusion, and the real `JsonlSink`
   regression behind it, are recorded in
-  [TR-001](delivery/tr-001-binding-admission.md).
+  TR-001.
 
 - Add a thin uv adapter (UvToolBackend) that delegates resolution, download and environments to uv, with per-artifact environments, shared receipts and a hashed Linux lock description. Acquisition and execution stay separately permitted. See [uv tool environments](uv-tool-assets.md).
 
@@ -49,8 +49,8 @@
   thin `shared_definition_documents`/`load_shared_definitions`/`register_shared_definitions`
   entries over the existing Catalog. Tool/asset identity, Provider, Scope and Binding
   semantics are unchanged; no second registry, installer or implicit loading is added.
-  See [shared asset definitions](shared-definitions.md) and the
-  [issue #16 delivery](tasks/vesryn-tool-runtime/P1-shared-asset-registration-foundation.md).
+  See shared asset definitions and the
+  issue #16 delivery.
 
 - Bundle eleven CI program assets in four independently readable groups: Vulture,
   Pyright, deptry, Pylint, OSV-Scanner, actionlint, ShellCheck, zizmor, Semgrep,
@@ -96,7 +96,7 @@ its separate #14 acceptance is not part of this asset-consumer patch.
   Schemas. No retrieval, ranking, admission, binding-management or health
   algorithm is introduced. See
   [discovery field contracts](discovery-contracts.md) and the
-  [issue #27 delivery](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md).
+  issue #27 delivery.
 ## Unreleased
 
 - Redo the discovery record foundation for the reopened issue #27: the three
@@ -113,7 +113,7 @@ its separate #14 acceptance is not part of this asset-consumer patch.
   deviations (including the forced access_id composition); old formats are
   explicitly unsupported with no compatibility layer. See
   [discovery contracts](discovery-contracts.md) and the
-  [issue #27 redo record](tasks/vesryn-tool-runtime/P1-discovery-field-contract.md).
+  issue #27 redo record.
 
 ## Unreleased (TR-DISC-01B)
 
@@ -129,5 +129,5 @@ its separate #14 acceptance is not part of this asset-consumer patch.
   traversal, missing tool vs no-entry distinguished), plus a temporary
   read-only bridge (legacy_preparation_definitions) for the old preparation
   callers that #33 removes. See
-  [shared definitions](shared-definitions.md) and the
-  [issue #32 delivery](tasks/vesryn-tool-runtime/P1-unified-tool-registration.md).
+  discovery contracts and the
+  issue #32 delivery.
