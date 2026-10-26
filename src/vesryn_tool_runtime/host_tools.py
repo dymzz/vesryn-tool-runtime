@@ -431,18 +431,18 @@ def prepare_tool(
     )
     if legacy_release is None:
         raise HostToolError("no_preparation_release", f"{tool_id} {release.version}")
-    selection = AssetSelection(
-        tool_id,
-        None,
-        None,
-        definition.asset_id,
-        definition.catalog_revision,
-        definition.sha256,
-        target,
-        AssetPolicy("host-prepare"),
-        legacy_release,
-    )
     try:
+        selection = AssetSelection(
+            tool_id,
+            None,
+            None,
+            definition.asset_id,
+            definition.catalog_revision,
+            definition.sha256,
+            target,
+            AssetPolicy("host-prepare"),
+            legacy_release,
+        )
         receipt = backend.prepare(
             selection, policy=AssetPolicy("host-prepare"), allow_network=allow_network
         )
