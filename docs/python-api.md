@@ -103,7 +103,9 @@ class EchoAdapter(ToolAdapter):
         results = []
         for call in calls:
             msg = call.inputs.get("message", "")
-            results.append(ToolResult(status="passed", exit_code=0, outputs={"echo": msg}))
+            results.append(
+                ToolResult(status="passed", exit_code=0, outputs={"echo": msg})
+            )
         return tuple(results)
 
 
@@ -119,7 +121,9 @@ catalog = Catalog()
 catalog.register(spec, EchoAdapter())
 scope = DiscoveryScope(permissions=("tool:demo.echo",))
 
-receipt = invoke_tool("demo.echo", inputs={"message": "hello"}, catalog=catalog, scope=scope)
+receipt = invoke_tool(
+    "demo.echo", inputs={"message": "hello"}, catalog=catalog, scope=scope
+)
 assert receipt.results[0]["outputs"]["echo"] == "hello"
 ```
 
