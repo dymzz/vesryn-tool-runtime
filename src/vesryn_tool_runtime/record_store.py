@@ -24,7 +24,13 @@ from .discovery_records import (
     _name,
 )
 from .documents import canonical
-from .record_schema import SCHEMA_VERSION, TABLE_COLUMNS, schema_matches, schema_sql
+from .record_schema import (
+    SCHEMA_VERSION,
+    TABLE_COLUMNS,
+    expected_schema,
+    schema_matches,
+    schema_sql,
+)
 
 
 def _translate(error, duplicate_code):
@@ -449,3 +455,53 @@ def open_record_store(path):
         db.close()
         raise
     return RecordStore(db)
+
+
+def upgrade_record_store(path):
+    """Explicitly upgrade an existing v3 store; opening never migrates it.
+
+    Installation ownership and registrations are preserved. A v3 boolean
+    cannot prove which artifact was installed, so its provenance is unknown.
+    The upgrade is one SQLite transaction, including schema and version.
+    Returns True for an upgrade and False for an already-current store.
+    """
+    if not isinstance(path, (str, Path)) or str(path) == ":memory:":
+        raise RecordError("invalid_store")
+    db = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=rw", uri=True)
+    try:
+        db.execute("PRAGMA foreign_keys = ON")
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute("PRAGMA user_version").fetchone()[0]
+        if current == SCHEMA_VERSION:
+            if not schema_matches(db):
+                raise RecordError("schema_drift")
+            db.commit()
+            return False
+        if current != 3:
+            raise RecordError("unsupported_schema")
+        if not schema_matches(db, resource="record_schema_v3.sql"):
+            raise RecordError("schema_drift")
+        ddl = expected_schema()
+        db.execute("ALTER TABLE tool_install RENAME TO tool_install_v3")
+        db.execute(ddl["tool_install"])
+        db.execute(
+            "INSERT INTO tool_install"
+            " (tool_id, command, version, entry, description, prepared_via,"
+            " reused, verified_source, verified_sha256, registered_at)"
+            " SELECT tool_id, command, version, entry, description, prepared_via,"
+            " reused, NULL, NULL, registered_at FROM tool_install_v3"
+        )
+        db.execute("DROP TABLE tool_install_v3")
+        db.execute("DROP TABLE record_schema")
+        db.execute(ddl["record_schema"])
+        db.execute("INSERT INTO record_schema VALUES (?)", (SCHEMA_VERSION,))
+        db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        if not schema_matches(db):
+            raise RecordError("schema_drift")
+        db.commit()
+        return True
+    except BaseException:
+        db.rollback()
+        raise
+    finally:
+        db.close()

@@ -62,7 +62,7 @@ jobs:
           release = store.assets.get("probe").versions[0]
           assert (release.platform.abi, release.python) == ("gnu", ">=3.10")
           store.close()
-          assert SCHEMA_VERSION == 3
+          assert SCHEMA_VERSION == 4
           from vesryn_tool_runtime import default_tools
           assert [item['tool_id'] for item in default_tools()] == [
               'vulture', 'hyperfine',

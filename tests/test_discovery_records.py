@@ -529,7 +529,7 @@ def test_constraint_stripped_databases_are_refused(tmp_path):
         "CREATE TABLE tool_access (access_id TEXT, tool_id TEXT, method TEXT,"
         " target TEXT, contract TEXT, summary TEXT);"
     )
-    db.execute("PRAGMA user_version = 3")
+    db.execute("PRAGMA user_version = 4")
     db.commit()
     db.close()
     with pytest.raises(RecordError, match="schema_drift"):
@@ -579,3 +579,60 @@ def test_committed_library_round_trips_the_seeded_examples():
     }
     assert entries["trivy.cli"].method == "uv"
     handle.close()
+
+
+@pytest.mark.parametrize("corrupt", [False, True])
+def test_explicit_install_proof_upgrade_preserves_facts_and_rolls_back(
+    tmp_path, corrupt
+):
+    from importlib.resources import files
+
+    from vesryn_tool_runtime import upgrade_record_store
+
+    path = tmp_path / "v3.sqlite3"
+    old_sql = files("vesryn_tool_runtime").joinpath("record_schema_v3.sql").read_text()
+    db = sqlite3.connect(path)
+    db.executescript(old_sql)
+    db.execute("PRAGMA user_version = 3")
+    db.execute(
+        "INSERT INTO tool_asset VALUES ('vulture', 'vulture', 'uv', NULL, 'vulture')"
+    )
+    db.execute(
+        "INSERT INTO tool_release"
+        " (tool_id, version, source, digest_type, digest) VALUES (?, ?, ?, ?, ?)",
+        ("vulture", "2.16", "https://example.test/vulture.whl", "sha256", "a" * 64),
+    )
+    if corrupt:
+        db.execute("PRAGMA ignore_check_constraints = ON")
+    command = "" if corrupt else "vulture"
+    db.execute(
+        "INSERT INTO tool_install VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("vulture", command, "2.16", "vulture.exe", "dead code", "uv", 0, 1, "now"),
+    )
+    db.commit()
+    db.close()
+    original = path.read_bytes()
+    # Ordinary reads must never silently migrate a user's registration store.
+    with pytest.raises(RecordError, match="unsupported_schema"):
+        open_record_store(path)
+    assert path.read_bytes() == original
+    if corrupt:
+        with pytest.raises(sqlite3.IntegrityError):
+            upgrade_record_store(path)
+        db = sqlite3.connect(path)
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert db.execute("SELECT source_verified FROM tool_install").fetchone() == (1,)
+        assert not db.execute(
+            "SELECT name FROM sqlite_master WHERE name='tool_install_v3'"
+        ).fetchall()
+        db.close()
+    else:
+        assert upgrade_record_store(path) is True
+        assert upgrade_record_store(path) is False
+        store = open_record_store(path)
+        assert store.assets.get("vulture").entrypoint == "vulture"
+        assert store._db.execute(
+            "SELECT version, entry, description, prepared_via, verified_source,"
+            " verified_sha256 FROM tool_install"
+        ).fetchone() == ("2.16", "vulture.exe", "dead code", "uv", None, None)
+        store.close()

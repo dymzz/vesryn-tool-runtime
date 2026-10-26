@@ -65,7 +65,7 @@ from .record_sources import (
     compose_catalog,
     legacy_preparation_definitions,
 )
-from .record_store import open_record_store
+from .record_store import open_record_store, upgrade_record_store
 from .registry import compose, provider
 from .scope import DiscoveryScope
 from .uv_assets import UvLock, UvToolBackend
@@ -128,6 +128,7 @@ __all__ = [
     "record_from_document",
     "refresh_tools",
     "uninstall_tool",
+    "upgrade_record_store",
     "user_data_root",
     "verify_binding",
     "verify_document",

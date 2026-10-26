@@ -73,10 +73,16 @@ CREATE TABLE tool_install (
         prepared_via IN ('uv', 'aria2', 'external')
     ),
     reused          INTEGER NOT NULL CHECK (reused IN (0, 1)),
-    source_verified INTEGER NOT NULL CHECK (source_verified IN (0, 1)),
-    registered_at   TEXT NOT NULL CHECK (length(registered_at) > 0)
+    verified_source TEXT,
+    verified_sha256 TEXT,
+    registered_at   TEXT NOT NULL CHECK (length(registered_at) > 0),
+    CHECK ((verified_source IS NULL) = (verified_sha256 IS NULL)),
+    CHECK (verified_source IS NULL OR length(verified_source) > 0),
+    CHECK (verified_sha256 IS NULL OR (
+        length(verified_sha256) = 64 AND verified_sha256 NOT GLOB '*[^0-9a-f]*'
+    ))
 );
 CREATE TABLE record_schema (
-    schema_version INTEGER PRIMARY KEY CHECK (schema_version = 3)
+    schema_version INTEGER PRIMARY KEY CHECK (schema_version = 4)
 );
-INSERT INTO record_schema (schema_version) VALUES (3);
+INSERT INTO record_schema (schema_version) VALUES (4);

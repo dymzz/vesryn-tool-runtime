@@ -39,6 +39,23 @@ Single field source for the three records. Every field below maps to exactly one
 
 本地安装记录通过 tool_id、版本、平台及摘要关联实际制品;本地路径不成为工具主键。
 
+## Host installation facts (`tool_install`)
+
+这张表记录本地安装事实，与上述三类 Catalog 记录分开。
+
+| 列 | 含义 |
+| --- | --- |
+| `tool_id` | 安装对应的工具身份，外键关联 `tool_asset` |
+| `command`, `version`, `entry` | 经入口和版本探测确认的命令、版本和实际解析路径 |
+| `description` | Agent 名单中的简短用途 |
+| `prepared_via` | 安装归属：`uv`、`aria2` 或 `external`，不决定校验资格 |
+| `reused` | 最近一次准备操作是否复用了已有安装 |
+| `verified_source`, `verified_sha256` | 实际校验并用于该安装的制品来源和 SHA256；成对存在或成对为空 |
+| `registered_at` | 登记更新时间 |
+
+当前声明是否与安装证据匹配由版本、入口、来源和摘要共同判断。
+下载缓存和可变的 Catalog 声明不能补造安装证据；缺少制品来源证据不影响已通过探测的 CLI 被登记和直接使用。
+
 ## ToolGroup — Agent 的发现入口
 
 | 字段 | 记录字段 | 列 | 规则 |
@@ -99,3 +116,11 @@ catalog = compose_catalog(store)
 
 - 旧能力 ID 与旧 asset_id 留在确有来源的旧契约/历史数据中,**不作为新工具主键**;新公共对象一律 tool_id / group_id / access_id。
 - 旧格式**不支持转换,且不提供任何兼容层**:PR #28 时代的组成员无组内 summary/aliases、入口摘要无 method/target,缺失字段无法补造,结论为明确的 unsupported。
+
+Schema 4 用安装来源和 SHA256 替换持久化校验布尔值。
+`open_record_store(path)` 拒绝旧 Schema，不隐式迁移。
+`upgrade_record_store(path) -> bool` 明确升级有效的 v3 库：成功升级返回 `True`，
+已是当前结构返回 `False`；整个升级在一个 SQLite 事务中完成，失败回滚。
+登记、安装归属和入口事实保留，旧布尔值不能补造来源证据。
+显式的宿主准备、名单重建和卸载会维护其选定的库；导入、Catalog 读取和 SessionStart 不迁移。
+`record_schema_v3.sql` 仅用于核对升级前的历史 DDL，不是并行运行的兼容结构。
