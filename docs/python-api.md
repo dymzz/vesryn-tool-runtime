@@ -1,41 +1,157 @@
-# Public Python API (0.1.0)
+# Public Python API
 
-Import public symbols from `vesryn_tool_runtime`. `ToolRuntimeError` is a
-`ValueError`; the legacy `documents.WorkflowError` names the same exception type.
-`documents.canonical`, `digest`, `read`, `decode`, `write`, and the documented
-`schemas` helpers retain bounded, finite, deterministic JSON behavior. Documents
-use a 2 MiB bound and reject duplicate fields; writes are exclusive or atomic.
+This document describes the currently supported public API groups, essential behavioral contracts, failure semantics, and usage patterns in `vesryn_tool_runtime`.
 
-| API | Contract |
-| --- | --- |
-| `ToolSpec` | Existing fields/defaults and SHA-256 computation. Purpose/display metadata does not change the contract digest; schemas, effect, recovery, environment and source do. `document`, `summary`, `validate`, `sha256` retain existing behavior. Write tools require manual recovery. |
-| `ToolResult` | `status`, `exit_code`, `outputs`, `executed`, `complete`, `current`, `reused`, `report_generated`, `reason`, optional `summary`; `document()` serializes facts. |
-| `Invocation` | Existing `step_id`, `tool_id`, `inputs`, `attempt`, optional `previous`. Attempts are positive for dispatch and step IDs unique within a request. |
-| `ExecutionContext` | Existing `execution_id`, `generation_id`, `definition_id`, `run_dir`, `predecessors`. Direct calls use a default context without workflow identifiers; no new workflow model is introduced. |
-| `ToolAdapter.invoke(calls, context)` | Receives a tuple of admitted Invocations; returns exactly one ToolResult per step_id. Backend execution and previous-evidence verification remain adapter responsibilities. |
-| `Catalog` | `register`, `merge`, `resolve`, `documents`, `page`, `search`; duplicate ownership is rejected atomically. `provider_for(tool_id)` retains declared Provider ownership across composition. |
-| `DiscoveryScope` | Existing repository/task labels, environment, permissions, availability and host constraint. `matches` filters; `admit` requires explicit permissions. Repository labels never grant permission. |
-| `compose(*catalogs)` | Explicitly combines existing Catalogs. No global registry or automatic matching. |
-| `provider(name, root)` | Loads exactly one explicitly named installed `vesryn.adapters` entry point, preserving the existing discovery mechanism. Reserved shared provider names cannot load as domain providers. |
-| `create_binding(catalog, tool_id, *, provider, parameters=None, scope=None)` | Returns a Schema 1 binding document; no workflow or persistence. Provider identity must be declared on the supplied Catalog. |
-| `verify_document(binding)` | Schema and canonical integrity validation. |
-| `verify_binding(binding, catalog, *, current_scope=None)` | Checks current tool version/hash/summary, Provider, parameters, bound and current scope; returns `(spec, adapter)`. No reselection or permission grant. |
-| `ToolRuntime(catalog, *, scope=None, event_sink=None)` | Defaults to Catalog discovery scope or discovery-only scope. |
-| `runtime.invoke(call, context=None, *, binding=None)` | Single invocation, returns DispatchReceipt. |
-| `runtime.dispatch(calls, context=None, *, bindings=None, batch_id=None)` | Groups calls by original Adapter identity; one invocation per admitted Adapter group. Bindings map step IDs to frozen documents. |
-| `invoke_tool(tool_id, inputs=None, *, catalog, scope, context=None, binding=None, event_sink=None)` | Direct one-call convenience API, with step ID `call` and attempt 1. No disk side effects unless Adapter/Sink writes. |
-| `checked_result(result, spec)` | Strict result and output validation; returns a document or raises ToolRuntimeError. |
+> **Note**: Exhaustive, symbol-level API reference documentation is generated from docstrings and type annotations via Sphinx AutoAPI in subsequent documentation tooling integration.
 
-`DispatchReceipt` contains `results` (validated/normalized result documents),
-`execution_facts` (safe original Adapter facts, including its actual exit code), unique
-`invocation_ids`, `batch_ids`, `admission_errors`, `validation_errors`,
-`observation_errors`, `observation_status` and `interrupted`. Diagnostics are safe
-fixed messages, without input or SDK error contents. Observation status is
-`not_configured`, `complete` or `incomplete` for this dispatch only.
+Import all public symbols directly from `vesryn_tool_runtime`.
 
-`registry.scoped_catalog(catalog, scope)` applies the existing scoped Adapter
-wrapper while preserving original batching and per-tool Provider identity.
+## 1. Public API Groups
 
-The extracted `dagger_discovery` module exposes existing exposure loading,
-introspection, mapping and registration interfaces from Vesryn. It maps explicit
-TypeDefs/exposures without importing the Dagger SDK or executing exposed functions.
+All 60 exported symbols in `__all__` belong to seven cohesive functional groups:
+
+### 1.1 Tool Contracts & Invocation
+- **Core Types**: `ToolSpec`, `ToolResult`, `Invocation`, `ExecutionContext`, `ToolAdapter`, `DispatchReceipt`.
+- **Runtime & Execution**: `ToolRuntime`, `invoke_tool()`, `checked_result()`.
+- **Exceptions**: `ToolRuntimeError` (base exception for runtime errors).
+
+Contracts define generic tools independent of workflow engines. `ToolAdapter.invoke(calls, context)` receives admitted Invocations and yields one `ToolResult` per step. `ToolRuntime` handles batch grouping, admission evaluation, result validation, and safe observation emission.
+
+### 1.2 Catalog & Providers
+- **Catalog Management**: `Catalog`, `compose()`, `compose_catalog()`, `ComposedCatalog`.
+- **Providers & Scope**: `provider()`, `DiscoveryScope`.
+
+Catalogs represent explicit collections of tool specifications and adapters. Duplicate tool ownership is rejected atomically during composition. `DiscoveryScope` governs visibility filtering and host-level admission permissions.
+
+### 1.3 Selection Binding
+- **Binding Functions**: `create_binding()`, `verify_binding()`, `canonical_binding()`, `verify_document()`.
+- **Constants**: `SELECTION_BINDING` (Schema 1 identifier).
+
+Selection bindings freeze the exact contract hash, tool version, provider identity, parameter constraints, and scope permissions into an immutable, verifiable document.
+
+### 1.4 Discovery Records & Store
+- **Record Types**: `ToolAsset`, `ToolGroup`, `ToolAccess`, `GroupMember`, `Platform`, `ToolAssetVersion`.
+- **Store & Seed**: `open_record_store()`, `bundled_records()`.
+- **Serialization**: `record_document()`, `record_from_document()`.
+- **Query & Pagination**: `DiscoveryQuery`, `DiscoveryPage`, `DiscoveryDiagnostic`, `DiscoveryErrorDocument`.
+- **Exceptions**: `RecordError`, `DiscoveryContractError`.
+
+Provides a normalized six-table SQLite backing store for tool assets, releases, groups, and access entry points with progressive disclosure contracts.
+
+### 1.5 Asset Contracts & Backends
+- **Asset Definitions & Policy**: `AssetDefinition`, `AssetRelease`, `AssetTarget`, `AssetSelection`, `AssetPolicy`.
+- **Index & Receipts**: `AssetIndex`, `AssetReceipt`, `AssetFile`, `asset_root()`, `native_asset_directory()`.
+- **Backends & Delivery**: `Aria2NativeBackend`, `Aria2Source`, `NativeAssetDelivery`, `UvToolBackend`, `UvLock`.
+- **Exceptions**: `AssetError`.
+
+Manages CLI asset declarations, target resolution (including Linux glibc/musl ABI constraints), receipts, aria2 native payload verification, and uv tool environments.
+
+### 1.6 Host Tools Lifecycle
+- **Functions**: `default_tools()`, `prepare_tool()`, `refresh_tools()`, `uninstall_tool()`, `user_data_root()`.
+- **Exceptions**: `HostToolError`.
+
+Manages host-level tool preparation and uninstallation, maintaining authoritative registration facts in SQLite (`tools.sqlite3`) and publishing the Agent-facing tool manifest (`tools.json`).
+
+### 1.7 Compatibility Bridge
+- **Functions**: `legacy_preparation_definitions()`.
+
+Read-only adapter translating live record assets into legacy preparation structures for preparation backends.
+
+---
+
+## 2. Core Behavioral & Failure Contracts
+
+1. **Deterministic Bounded Documents**:
+   - JSON serialization adheres to strict bounds (default 2 MiB) with rejection of duplicate keys and NaN/Infinity values.
+   - File writes are atomic or exclusive (`filelock`).
+
+2. **Admission and Scope Gates**:
+   - Tool discovery filtering precedes ranking and pagination.
+   - Tool admission requires explicit host scope approval; discovery never implies execution admission.
+
+3. **Result Validation**:
+   - `checked_result(result, spec)` validates returned outputs strictly against the tool's declared JSON Schema.
+   - If execution fails and output validation also fails, the non-zero exit code is preserved while `validation_errors` records the schema violation.
+
+4. **Safe Event Emission**:
+   - Events emitted to `vesryn_log.EventSink` include only allowlisted fields: tool ID, invocation ID, execution facts, status, and exit codes.
+   - Raw parameters, execution diagnostics, credentials, and SDK exceptions are never emitted to logs.
+
+5. **Dual-Store Host Tool Synchronization**:
+   - SQLite commit and `tools.json` publication are non-atomic across storage boundaries.
+   - If JSON synchronization fails after registration commits, `registered_not_synced` is reported; state is fully recovered by running `refresh_tools()`.
+
+---
+
+## 3. Representative Usage Examples
+
+### 3.1 Direct Tool Invocation
+
+```python
+from vesryn_tool_runtime import (
+    Catalog,
+    DiscoveryScope,
+    ToolAdapter,
+    ToolResult,
+    ToolSpec,
+    invoke_tool,
+)
+
+
+class EchoAdapter(ToolAdapter):
+    def invoke(self, calls, context):
+        results = []
+        for call in calls:
+            msg = call.inputs.get("message", "")
+            results.append(
+                ToolResult(status="passed", exit_code=0, outputs={"echo": msg})
+            )
+        return tuple(results)
+
+
+spec = ToolSpec(
+    tool_id="demo.echo",
+    contract_version="1.0.0",
+    description="Echo message",
+    inputs_schema={"type": "object", "properties": {"message": {"type": "string"}}},
+    outputs_schema={"type": "object", "properties": {"echo": {"type": "string"}}},
+)
+
+catalog = Catalog()
+catalog.register(spec, EchoAdapter())
+scope = DiscoveryScope(permissions=("tool:demo.echo",))
+
+receipt = invoke_tool(
+    "demo.echo", inputs={"message": "hello"}, catalog=catalog, scope=scope
+)
+assert receipt.results[0]["outputs"]["echo"] == "hello"
+```
+
+### 3.2 Bundled Records Loading and Catalog Composition
+
+```python
+from vesryn_tool_runtime import bundled_records, compose_catalog, open_record_store
+
+# Open persistent store (or in-memory with ":memory:")
+store = open_record_store("tools_records.sqlite3")
+
+# Atomic batch registration of bundled seed records
+store.put_records(bundled_records())
+
+# Read-only composed catalog for discovery and resolution
+catalog = compose_catalog(store)
+tool = catalog.resolve("ripgrep")
+```
+
+### 3.3 Host Tool Preparation
+
+```python
+from vesryn_tool_runtime import prepare_tool, refresh_tools
+
+# Explicitly prepare a tool declared in the seed records
+receipt = prepare_tool("pyright", version="1.1.414")
+
+if receipt["status"] == "registered_not_synced":
+    # Recover JSON manifest synchronization
+    refresh_tools()
+```

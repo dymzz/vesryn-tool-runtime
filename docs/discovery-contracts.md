@@ -1,10 +1,6 @@
-# ToolAsset / ToolGroup / ToolAccess field dictionary (issue #27, reopened)
+# ToolAsset / ToolGroup / ToolAccess field dictionary
 
-Single field source for the three records. Every field below is the issue's
-field table entry verbatim; each maps to exactly one record field and one
-SQLite column, and the frozen DDL (`data/record_schema.sql`) plus the parity
-check refuse any drift. Later tasks consume these records — they do not
-restate, rename or shadow them.
+Single field source for the three records. Every field below maps to exactly one record field and one SQLite column, backed by the package DDL resource (`src/vesryn_tool_runtime/record_schema.sql`) and live seed (`src/vesryn_tool_runtime/record_seed.sql`).
 
 ## Physical layout: three logical entities, six tables
 
@@ -17,13 +13,11 @@ restate, rename or shadow them.
 | `tool_group_member_alias` | `(group_id, tool_id, alias)` PK | 成员专属别名 |
 | `tool_access` | `access_id` PK | 每个入口独立的 method、target、contract、summary |
 
-`PRAGMA foreign_keys = ON` 强制:没有 `ToolAsset` 不能登记关联的
-`ToolAccess`/成员/发行物;一个工具可以关联多个不同入口;每个入口必须
-拥有独立的 `method`、`target`、`contract`;缺失必填字段直接失败。
+`PRAGMA foreign_keys = ON` 强制:没有 `ToolAsset` 不能登记关联的 `ToolAccess`/成员/发行物;一个工具可以关联多个不同入口;每个入口必须拥有独立的 `method`、`target`、`contract`;缺失必填字段直接失败。
 
 ## ToolAsset — 工具注册与资产来源
 
-| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| 字段 | 记录字段 | 列 | 规则 |
 | --- | --- | --- | --- |
 | tool_id · 必填;全局工具主键,按登记值使用 | `ToolAsset.tool_id` | `tool_asset.tool_id` PK | 裸名或点式均按登记值;更名、版本、平台、分组及访问入口变化均不另生成工具身份 |
 | name · 必填;工具标准名称 | `.name` | `name` NOT NULL | 非空 |
@@ -34,7 +28,7 @@ restate, rename or shadow them.
 
 ### tool_release 子记录(versions 的每条资产)
 
-| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| 字段 | 记录字段 | 列 | 规则 |
 | --- | --- | --- | --- |
 | version · 必填;实际工具版本 | `ToolAssetVersion.version` | `version` NOT NULL | 非空 |
 | platform · 平台相关资产必填;明确的 OS/架构表示 | `.platform` | `platform_os`,`platform_arch`,`platform_abi` | 成对出现、成对非空;`abi` 为该制品的 C 库/ABI 约束(deptry 的 manylinux wheel 是 `gnu`,musl 制品是 `musl`),同版本同 os/arch 不同 ABI 是不同记录;平台无关资产为 NULL |
@@ -47,7 +41,7 @@ restate, rename or shadow them.
 
 ## ToolGroup — Agent 的发现入口
 
-| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| 字段 | 记录字段 | 列 | 规则 |
 | --- | --- | --- | --- |
 | group_id · 必填;分组主键,支持原文示例 ci-security、ci-release | `ToolGroup.group_id` | `tool_group.group_id` PK | 按登记值 |
 | summary · 必填;整组能力摘要 | `.summary` | `summary` NOT NULL | 非空 |
@@ -55,7 +49,7 @@ restate, rename or shadow them.
 
 ### 成员子记录
 
-| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| 字段 | 记录字段 | 列 | 规则 |
 | --- | --- | --- | --- |
 | tool_id · 必填;关联 ToolAsset | `GroupMember.tool_id` | `tool_group_member.tool_id` FK | 外键强制存在 |
 | summary · 必填;该工具在本组中的用途 | `.summary` | `summary` NOT NULL | 组内专属;同一工具在不同组各持其文 |
@@ -65,7 +59,7 @@ restate, rename or shadow them.
 
 ## ToolAccess — 调用入口
 
-| 字段(issue 原文) | 记录字段 | 列 | 规则 |
+| 字段 | 记录字段 | 列 | 规则 |
 | --- | --- | --- | --- |
 | access_id · 必填;唯一入口标识,支持 trivy.scan、trivy.sbom、trivy.cli | `ToolAccess.access_id` | `tool_access.access_id` PK | **按登记值使用**,不强制拼接 catalog_ref、entry_key、本机路径或参数 |
 | tool_id · 必填;关联 ToolAsset | `.tool_id` | `tool_id` FK NOT NULL | 同一工具的多个入口使用同一 tool_id |
@@ -74,31 +68,34 @@ restate, rename or shadow them.
 | contract · 必填;调用参数、输入输出契约 | `.contract` | `contract` JSON 对象 NOT NULL | 复用已有 ToolSpec 或 Dagger 原生接口描述;每入口独立,单一 ToolSpec 契约不替代多个入口 |
 | summary · 必填;入口执行什么操作 | `.summary` | `summary` NOT NULL | 非空 |
 
-provider 描述资产来源,method 描述调用入口:由 uv 准备的 CLI 可以通过
-Dagger 入口执行。工具身份、入口身份与契约内部身份之间只建立引用,
-不强制新 tool_id 等于旧 ToolSpec 能力 ID。**全库无 `asset_id` 列**:
-旧 asset_id 不成为与 tool_id 同义的第二个工具身份。
+provider 描述资产来源,method 描述调用入口:由 uv 准备的 CLI 可以通过 Dagger 入口执行。工具身份、入口身份与契约内部身份之间只建立引用,不强制新 tool_id 等于旧 ToolSpec 能力 ID。**全库无 `asset_id` 列**:旧 asset_id 不成为与 tool_id 同义的第二个工具身份。
 
 ## Serialization, queries and storage
 
-- `record_document(record)` / `record_from_document(document)`:严格往返
-  (字段集精确,未知键拒绝);文档即记录,无平行摘要类型。
-- `DiscoveryQuery` / `DiscoveryPage`:分页与过滤沿用既有界(limit 默认
-  10,范围 1–50);页内条目就是三类记录的文档;诊断与查询错误独立于
-  ToolResult 业务状态。
-- `open_record_store(path)`:路径必填(`":memory:" 或调用者显式选择的
-  文件位置)——不存在从安装目录推导的默认可写位置;冻结 DDL 与种子
-  作为**包资源**交付(`record_schema.sql`、`record_seed.sql`,经
-  `importlib.resources` 读取),独立安装即可用;仓库演示库在
-  `data/records.sqlite3`;临时/缓存/产物属于 `.cache/`、`.tmp/`、
-  `.artifacts/`,不进 `data/`。
+- `record_document(record)` / `record_from_document(document)`: 严格往返(字段集精确,未知键拒绝);文档即记录,无平行摘要类型。
+- `DiscoveryQuery` / `DiscoveryPage`: 分页与过滤沿用既有界(limit 默认 10,范围 1–50);页内条目就是三类记录的文档;诊断与查询错误独立于 ToolResult 业务状态。
+- `open_record_store(path)`: 路径必填(`":memory:"` 或调用者显式选择的文件位置)——不存在从安装目录推导的默认可写位置;冻结 DDL 与种子作为**包资源**交付(`record_schema.sql`、`record_seed.sql`,经 `importlib.resources` 读取),独立安装即可用;仓库演示库在 `data/records.sqlite3`。
+
+### Live Record Registration and Composition
+
+```python
+from vesryn_tool_runtime import (
+    bundled_records,
+    compose_catalog,
+    open_record_store,
+)
+
+# 1. Open persistent or in-memory store
+store = open_record_store(path)
+
+# 2. Register bundled records atomically (idempotent / conflict detection)
+store.put_records(bundled_records())
+
+# 3. Explicit read-only Catalog composition
+catalog = compose_catalog(store)
+```
 
 ## Migration boundary (explicit)
 
-- 旧能力 ID 与旧 asset_id 留在确有来源的旧契约/历史数据中,**不作为
-  新工具主键**;新公共对象一律 tool_id / group_id / access_id。
-- 旧格式**不支持转换,且不提供任何兼容层**:PR #28 时代的组成员无组内
-  summary/aliases、入口摘要无 method/target,缺失字段无法补造,结论为
-  明确的 unsupported;不交付迁移代码,不虚构占位内容。
-- 后续任务(#32 登记 B、#33 资产 C、#34 入口 D、#35 发现 E)以本交付
-  为实施输入;发布过的任务文本不改写,冲突由其分支在本根上重建解决。
+- 旧能力 ID 与旧 asset_id 留在确有来源的旧契约/历史数据中,**不作为新工具主键**;新公共对象一律 tool_id / group_id / access_id。
+- 旧格式**不支持转换,且不提供任何兼容层**:PR #28 时代的组成员无组内 summary/aliases、入口摘要无 method/target,缺失字段无法补造,结论为明确的 unsupported。

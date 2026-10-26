@@ -90,10 +90,10 @@ it with `uv pip install --require-hashes -r`; a Windows `.venv` is never copied.
 
 [`examples/uv_tool_prepare.py`](../examples/uv_tool_prepare.py) prepares real
 vulture 2.16 and 2.14 wheels from PyPI and requests a Linux x86_64 lock. Recorded in
-[verification/tr-asset-01b.json](verification/tr-asset-01b.json). Tests in
+verification record (tr-asset-01b). Tests in
 `tests/test_uv_assets.py` use the real uv executable with hand-built wheels.
 
-The #5 [joint acceptance](tasks/vesryn-tool-runtime/P0-local-tool-assets.md) adds
+The #5 joint acceptance adds
 real native/Python version calls, offline reuse and public Dagger File/Directory
 and Linux lock consumption. Its current CI artifacts identify actual outcomes.
 
