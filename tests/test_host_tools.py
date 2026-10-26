@@ -3,7 +3,7 @@
 import json
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -40,8 +40,43 @@ def env(tmp_path):
             "PATH": str(binroot),
             "VESRYN_TOOLS_HOME": str(root),
             "VESRYN_BIN_HOME": str(binroot / "exposed"),
+            # The asset root is hermetic too: a test never reads or writes
+            # the host's own asset store.
+            "VESRYN_TOOL_ASSETS": str(tmp_path / "tool-assets"),
         },
     }
+
+
+def _declared_artifact(env):
+    """The vulture asset, its 2.16 release and where the artifact is stored."""
+    from urllib.parse import urlsplit
+
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    )
+    release = next(item for item in asset.versions if item.version == "2.16")
+    name = PurePosixPath(urlsplit(release.source).path).name
+    stored = (
+        Path(env["environ"]["VESRYN_TOOL_ASSETS"])
+        / "python"
+        / "asset-vulture"
+        / "version-2.16"
+        / release.digest
+        / name
+    )
+    return asset, release, stored
+
+
+def _store_artifact(stored):
+    """Put the verified artifact where the runtime puts it."""
+    stored.parent.mkdir(parents=True, exist_ok=True)
+    stored.write_bytes(b"the verified wheel")
+    return stored
 
 
 def make_command(binroot, name, output, system=None):
@@ -497,11 +532,11 @@ def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
     from vesryn_tool_runtime import host_tools
 
     calls = []
-    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
-    artifact.parent.mkdir(parents=True, exist_ok=True)
-    artifact.write_bytes(b"verified wheel")
+    _asset, _release, stored = _declared_artifact(env)
     monkeypatch.setattr(
-        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+        host_tools,
+        "_verified_artifact",
+        lambda asset, release, **kwargs: _store_artifact(stored),
     )
 
     def installing_uv(argv, **kwargs):
@@ -529,6 +564,66 @@ def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
     )
     assert again["status"] == "reused"
     assert again["prepared_via"] == "uv"
+    # The SAME artifact identity: the verification fact still holds.
+    assert again["source_verified"] is True
+
+
+def test_the_verification_state_requires_the_declared_artifact_identity(
+    env, monkeypatch
+):
+    """The verification fact is about an artifact identity, not a version.
+
+    The declared release's publisher digest must be the one the asset store
+    holds: a declaration that now offers another artifact for that version
+    describes bytes the runtime never verified, so the fact does not carry.
+    """
+    from types import SimpleNamespace
+
+    from vesryn_tool_runtime import host_tools
+
+    asset, release, stored = _declared_artifact(env)
+    monkeypatch.setattr(
+        host_tools,
+        "_verified_artifact",
+        lambda asset, release, **kwargs: _store_artifact(stored),
+    )
+
+    def installing_uv(argv, **kwargs):
+        if "tool" in argv:
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    outcome = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert outcome["status"] == "installed"
+    entry = outcome["entry"]
+
+    # The declared artifact is the verified one: the fact holds.
+    owner, verified = host_tools._existing_ownership(
+        asset, "2.16", entry, env["root"], env["environ"]
+    )
+    assert (owner, verified) == ("uv", True)
+
+    # The declaration now offers ANOTHER artifact for that version.
+    changed = SimpleNamespace(
+        tool_id=asset.tool_id,
+        provider=asset.provider,
+        versions=(
+            SimpleNamespace(version="2.16", digest="f" * 64, source=release.source),
+        ),
+    )
+    owner, verified = host_tools._existing_ownership(
+        changed, "2.16", entry, env["root"], env["environ"]
+    )
+    # The owner is a fact about the entry and stays; the verification fact
+    # is about the artifact and does not carry.
+    assert owner == "uv"
+    assert verified is False
 
 
 def test_a_switched_version_does_not_inherit_the_verification_state(env, monkeypatch):
