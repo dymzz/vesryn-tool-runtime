@@ -125,17 +125,20 @@ def test_version_conflict_is_reported_not_overwritten(env):
 def test_missing_python_cli_installed_via_uv_and_registered(env):
     calls = []
 
-    def fake_uv(argv, **kwargs):
-        calls.append(argv)
-        # The install makes the command resolvable.
-        make_command(env["bin"], "vulture", "vulture 2.16")
-        return subprocess.CompletedProcess(argv, 0, "", "")
+    def installing_uv(argv, **kwargs):
+        if len(argv) >= 3 and argv[1] == "tool":
+            calls.append(argv)
+            # The install makes the command resolvable.
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        # The version probe really runs.
+        return run_real(argv, **kwargs)
 
     outcome = prepare_tool(
         "vulture",
         root=env["root"],
         environ=env["environ"],
-        runner=fake_uv,
+        runner=installing_uv,
     )
     assert outcome["status"] == "installed"
     assert outcome["source_verified"] is True
@@ -238,12 +241,16 @@ def test_tools_json_shape_is_strict_and_unlisted_when_not_resolvable(env):
         for r in bundled_records()
         if isinstance(r, ToolAsset) and r.tool_id == "hyperfine"
     )
+    # The recorded entry is the artifact the shell must end up resolving.
+    entry = env["bin"] / (
+        "hyperfine.bat" if sys.platform.startswith("win") else "hyperfine"
+    )
     host_tools._register(
         env["root"],
         asset,
         "hyperfine",
         "2.0.0",
-        str(env["root"] / "payload" / "hyperfine"),
+        str(entry),
         "命令行基准测试计时",
         "aria2",
         reused=False,
@@ -266,3 +273,182 @@ def test_tools_json_shape_is_strict_and_unlisted_when_not_resolvable(env):
     assert [item["command"] for item in entries] == ["hyperfine", "vulture"]
     for item in entries:
         assert set(item) == {"command", "description"}
+
+
+def test_selected_version_mismatch_is_a_conflict(env):
+    """Reuse needs the SELECTED version, not any declared one (issue #33)."""
+    make_command(env["bin"], "vulture", "vulture 2.14")
+    outcome = prepare_tool(
+        "vulture",
+        version="2.16",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    assert outcome["status"] == "conflict"
+    assert "2.14" in outcome["detail"]
+    # Nothing is registered and nothing is listed.
+    assert not tools_json(env["root"]).exists()
+
+
+def test_version_match_is_not_a_substring_match(env):
+    """ "2.0.0" is not inside "12.0.0"."""
+    make_command(env["bin"], "hyperfine", "hyperfine 12.0.0")
+    outcome = prepare_tool(
+        "hyperfine",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    assert outcome["status"] == "conflict"
+
+
+def test_install_is_verified_against_the_running_entry(env):
+    """A same-name entry must not be registered as the selected release."""
+    from vesryn_tool_runtime import host_tools
+
+    def shadowing_uv(argv, **kwargs):
+        if len(argv) >= 3 and argv[1] == "tool":
+            # The install leaves an OLDER entry first on PATH.
+            make_command(env["bin"], "vulture", "vulture 2.14")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    outcome = prepare_tool(
+        "vulture",
+        version="2.16",
+        root=env["root"],
+        environ=env["environ"],
+        runner=shadowing_uv,
+    )
+    assert outcome["status"] == "conflict"
+    # No verification is claimed for an entry that was not verified, and
+    # nothing is registered for it.
+    assert "source_verified" not in outcome
+    assert not tools_json(env["root"]).exists()
+    assert not host_tools.tools_database(env["root"]).exists()
+
+
+def test_uninstall_removes_the_exposed_copy(env, monkeypatch):
+    """The exposure copy is this runtime's own file and goes with it."""
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    monkeypatch.setenv("VESRYN_BIN_HOME", str(env["bin"] / "exposed"))
+    exposed = env["bin"] / "exposed" / "hyperfine.exe"
+    exposed.parent.mkdir(parents=True, exist_ok=True)
+    exposed.write_bytes(b"payload-bytes")
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "hyperfine"
+    )
+    host_tools._register(
+        env["root"],
+        asset,
+        "hyperfine",
+        "2.0.0",
+        str(exposed),
+        "命令行基准测试计时",
+        "aria2",
+        reused=False,
+        source_verified=True,
+        status="installed",
+    )
+    uninstall_tool("hyperfine", root=env["root"])
+    assert not exposed.exists()
+
+
+def test_uninstall_gives_uv_the_package_name(env):
+    """uv removes the PACKAGE; the command may have another name."""
+    calls = []
+
+    def installing_uv(argv, **kwargs):
+        if len(argv) >= 3 and argv[1] == "tool":
+            make_command(env["bin"], "lint-imports", "lint-imports 2.15")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    outcome = prepare_tool(
+        "import-linter",
+        command="lint-imports",
+        description="import 边界检查",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert outcome["status"] == "installed"
+
+    def fake_uv(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    uninstall_tool("import-linter", root=env["root"], runner=fake_uv)
+    assert calls == [["uv", "tool", "uninstall", "import-linter"]]
+
+
+def test_exposure_directory_follows_the_target_environ(env):
+    """The exposure directory comes from the target environment."""
+    from vesryn_tool_runtime import host_tools
+
+    payload = env["root"] / "payload"
+    payload.mkdir(parents=True, exist_ok=True)
+    (payload / "tool.exe").write_bytes(b"payload-bytes")
+    target = env["bin"] / "from-environ"
+    entry = host_tools._expose_native_entry(
+        "demo",
+        payload / "tool.exe",
+        env["root"],
+        environ={"VESRYN_BIN_HOME": str(target)},
+    )
+    assert entry.parent == target
+    assert entry.read_bytes() == b"payload-bytes"
+
+
+def test_list_skips_a_same_name_entry_that_is_not_the_registered_one(env):
+    """The Agent must run the verified artifact, not a same-name binary."""
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    make_command(env["bin"], "vulture", "vulture 2.16")
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    )
+    host_tools._register(
+        env["root"],
+        asset,
+        "vulture",
+        "2.16",
+        str(env["root"] / "elsewhere" / "vulture"),
+        "检测 Python 无用代码",
+        "external",
+        reused=True,
+        source_verified=False,
+        status="reused",
+    )
+    refresh_tools(root=env["root"], environ=env["environ"])
+    assert read_json(tools_json(env["root"])) == []
+
+
+def test_default_list_ships_as_a_data_resource():
+    """The packaged default list lives at data/default-tools.json."""
+    from importlib.resources import files
+
+    resource = files("vesryn_tool_runtime").joinpath("data", "default-tools.json")
+    assert resource.is_file()
+
+
+def test_probe_reads_an_entry_in_a_path_with_spaces(tmp_path):
+    """A resolved path may carry spaces (Program Files, ...)."""
+    from vesryn_tool_runtime import host_tools
+
+    binroot = tmp_path / "bin with spaces"
+    binroot.mkdir()
+    make_command(binroot, "vulture", "vulture 2.16")
+    entry, shown = host_tools._probe("vulture", {"PATH": str(binroot)}, run_real)
+    assert entry is not None
+    assert "2.16" in (shown or "")

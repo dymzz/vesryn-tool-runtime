@@ -24,6 +24,7 @@ hash is never reported as a verified publisher digest.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
@@ -31,16 +32,29 @@ from importlib.resources import files as resource_files
 from pathlib import Path
 
 from .asset_index import AssetIndex, asset_root
-from .assets import AssetPolicy, AssetTarget
+from .assets import AssetError, AssetPolicy, AssetTarget
 from .discovery_records import RecordError, ToolAsset
 from .native_assets import Aria2NativeBackend, Aria2Source
 from .record_sources import legacy_preparation_definitions
 from .record_store import open_record_store
 
-DEFAULT_TOOLS_RESOURCE = "default-tools.json"
+DEFAULT_TOOLS_RESOURCE = "data/default-tools.json"
 
-PREPARE_STATUSES = ("reused", "installed", "conflict", "missing_release")
+# The statuses an outcome document may carry. Everything else is raised as a
+# HostToolError with a stable code (missing_release, backend_required,
+# install_incomplete, uv_install_failed, entry_conflict, list_not_written,
+# not_registered, invalid_input, unknown_tool).
+PREPARE_STATUSES = (
+    "reused",
+    "installed",
+    "conflict",
+    "install_failed",
+    "registered_not_synced",
+)
 VIA_VALUES = ("uv", "aria2", "external")
+
+# A version-like token in a --version line: "2.16", "15.2.0", "1.31.1-rc1".
+_VERSION_TOKEN = re.compile(r"\d+(?:\.\d+)+(?:[-_.]?[0-9A-Za-z]+)*")
 
 
 class HostToolError(Exception):
@@ -53,7 +67,11 @@ class HostToolError(Exception):
 
 
 def default_tools():
-    """The packaged default preparation candidates; a pure read."""
+    """The packaged default preparation candidates; a pure read.
+
+    The resource lives at ``vesryn_tool_runtime/data/default-tools.json``
+    inside the wheel; reading it registers, downloads and installs nothing.
+    """
     raw = (
         resource_files(__package__)
         .joinpath(DEFAULT_TOOLS_RESOURCE)
@@ -138,9 +156,12 @@ def _probe(command, environ, runner):
     entry = _which(command, environ)
     if entry is None:
         return None, None
-    argv = [entry, "--version"]
     if entry.lower().endswith((".bat", ".cmd")):
-        argv = ["cmd", "/c", entry, "--version"]
+        # cmd.exe needs the whole line quoted, otherwise a path with
+        # spaces is split into two arguments.
+        argv = f'cmd /c ""{entry}" --version"'
+    else:
+        argv = [entry, "--version"]
     try:
         result = runner(
             argv,
@@ -153,10 +174,53 @@ def _probe(command, environ, runner):
         )
     except OSError, subprocess.SubprocessError:
         return entry, None
-    return entry, (result.stdout or "").strip()
+    output = (result.stdout or "").strip()
+    if not output:
+        output = (result.stderr or "").strip()
+    return entry, output
 
 
-def _find_release(asset, version, environ, platform=None):
+def _reported_versions(text):
+    """The version-like tokens a --version line actually reports."""
+    if not text:
+        return frozenset()
+    return frozenset(_VERSION_TOKEN.findall(text))
+
+
+def _version_matches(reported, selected):
+    """True when the reported line contains the selected version.
+
+    Whole tokens only: "2.1" must not match a reported "2.16" and
+    "2.16.0" is the same release as "2.16".
+    """
+    if not selected:
+        return False
+    if selected in reported:
+        return True
+    from packaging.version import InvalidVersion, Version
+
+    try:
+        wanted = Version(selected)
+    except InvalidVersion:
+        return False
+    for token in reported:
+        try:
+            if Version(token) == wanted:
+                return True
+        except InvalidVersion:
+            continue
+    return False
+
+
+def _matched_version(reported, candidates):
+    """The first candidate the reported line actually contains."""
+    for candidate in candidates:
+        if _version_matches(reported, candidate):
+            return candidate
+    return None
+
+
+def _find_release(asset, version, platform=None):
     host = sys_platform(platform)
     import platform as _platform
 
@@ -247,12 +311,20 @@ def prepare_tool(
         raise HostToolError("unknown_tool", tool_id)
     declared_versions = {item.version for item in asset.versions}
 
-    # Probe the target shell FIRST: an already-resolvable entry whose
-    # reported version matches ANY declared release is reused as-is —
-    # reuse needs no artifact, so a platform-row mismatch must not gate it.
+    # Probe the target shell FIRST: an already-resolvable entry is reused
+    # as-is, but only when it reports the SELECTED version. A same-name
+    # entry of another version is an honest conflict — it is never
+    # overwritten and never silently registered under another version.
     entry, shown = _probe(command, environ, runner)
     if entry is not None:
-        if shown is None or not any(v in shown for v in declared_versions):
+        reported = _reported_versions(shown)
+        if version is None:
+            # No explicit selection: any declared release the entry reports
+            # is a legitimate reuse, reported with the version it shows.
+            matched = _matched_version(reported, sorted(declared_versions))
+        else:
+            matched = version if _version_matches(reported, version) else None
+        if matched is None:
             return _outcome(
                 "conflict",
                 tool_id,
@@ -261,9 +333,6 @@ def prepare_tool(
                 entry,
                 detail=f"existing entry reports: {(shown or '')[:120]}",
             )
-        matched = next(
-            v for v in sorted(declared_versions, key=len, reverse=True) if v in shown
-        )
         return _register(
             root,
             asset,
@@ -278,33 +347,8 @@ def prepare_tool(
             environ=environ,
         )
 
-    release = _find_release(asset, version, environ, platform)
+    release = _find_release(asset, version, platform)
     version = release.version
-
-    entry, shown = _probe(command, environ, runner)
-    if entry is not None:
-        if shown is not None and version not in shown:
-            return _outcome(
-                "conflict",
-                tool_id,
-                command,
-                version,
-                entry,
-                detail=f"existing entry reports: {shown[:120]}",
-            )
-        return _register(
-            root,
-            asset,
-            command,
-            version,
-            entry,
-            description,
-            "external" if asset.provider != "uv" else "uv",
-            reused=True,
-            source_verified=False,
-            status="reused",
-            environ=environ,
-        )
 
     if asset.provider == "uv":
         _uv_install(uv, asset, release, runner)
@@ -312,6 +356,18 @@ def prepare_tool(
         if entry is None:
             raise HostToolError(
                 "install_incomplete", f"{command} not resolvable after uv install"
+            )
+        if not _version_matches(_reported_versions(shown), version):
+            # The resolved entry is not the selected release (a same-name
+            # entry shadows it): the Agent would run another version, so
+            # nothing is registered under the selected one.
+            return _outcome(
+                "conflict",
+                tool_id,
+                command,
+                version,
+                entry,
+                detail=f"resolved entry reports: {(shown or '')[:120]}",
             )
         return _register(
             root,
@@ -333,8 +389,13 @@ def prepare_tool(
             "native preparation needs a pinned aria2 executable",
         )
     executable, _version, sha256 = aria2
-    index = AssetIndex(asset_root(environ=environ))
-    backend = Aria2NativeBackend(index, aria2=Aria2Source(executable, _version, sha256))
+    try:
+        index = AssetIndex(asset_root(environ=environ))
+        backend = Aria2NativeBackend(
+            index, aria2=Aria2Source(executable, _version, sha256)
+        )
+    except AssetError as error:
+        raise HostToolError("invalid_backend", str(error)) from None
     target = AssetTarget(
         release.platform.os, release.platform.arch, abi=release.platform.abi
     )
@@ -344,15 +405,23 @@ def prepare_tool(
     from .assets import AssetSelection
 
     definition = next(
-        item for item in legacy_preparation_definitions() if item.asset_id == tool_id
+        (item for item in legacy_preparation_definitions() if item.asset_id == tool_id),
+        None,
     )
+    if definition is None:
+        raise HostToolError("no_preparation_definition", tool_id)
     legacy_release = next(
-        item
-        for item in definition.releases
-        if item.version == release.version
-        and item.os in {"any", release.platform.os}
-        and item.arch in {"any", release.platform.arch}
+        (
+            item
+            for item in definition.releases
+            if item.version == release.version
+            and item.os in {"any", release.platform.os}
+            and item.arch in {"any", release.platform.arch}
+        ),
+        None,
     )
+    if legacy_release is None:
+        raise HostToolError("no_preparation_release", f"{tool_id} {release.version}")
     selection = AssetSelection(
         tool_id,
         None,
@@ -364,19 +433,24 @@ def prepare_tool(
         AssetPolicy("host-prepare"),
         legacy_release,
     )
-    receipt = backend.prepare(
-        selection, policy=AssetPolicy("host-prepare"), allow_network=allow_network
-    )
-    if receipt.outcome.status != "passed":
-        return _outcome(
-            "install_failed",
-            tool_id,
-            command,
-            version,
-            None,
-            detail=receipt.outcome.reason or "",
+    try:
+        receipt = backend.prepare(
+            selection, policy=AssetPolicy("host-prepare"), allow_network=allow_network
         )
-    payload = backend.delivery(selection, policy=AssetPolicy("host-prepare")).executable
+        if receipt.outcome.status != "passed":
+            return _outcome(
+                "install_failed",
+                tool_id,
+                command,
+                version,
+                None,
+                detail=receipt.outcome.reason or "",
+            )
+        payload = backend.delivery(
+            selection, policy=AssetPolicy("host-prepare")
+        ).executable
+    except AssetError as error:
+        raise HostToolError("native_prepare_failed", str(error)) from None
     entry = str(_expose_native_entry(tool_id, Path(payload), root, environ=environ))
     return _register(
         root,
@@ -419,10 +493,10 @@ def _expose_native_entry(tool_id, payload, root, environ=None):
     overwritten."""
     import hashlib
 
-    target = bin_home() / Path(payload).name
+    target = bin_home(environ) / Path(payload).name
     # A Windows entry must carry .exe or the shell cannot resolve it.
-    if sys_platform() == "windows" and target.suffix == "":
-        target = target.with_suffix(".exe")
+    if sys_platform() == "windows" and target.suffix.lower() != ".exe":
+        target = target.with_name(target.name + ".exe")
     if target.exists():
 
         def _hash(path):
@@ -451,20 +525,36 @@ def _expose_native_entry(tool_id, payload, root, environ=None):
     return target
 
 
-def _owned_by(tool_id, target, root):
-    """True when target is this tool's own recorded entry."""
-    database = tools_database(root)
-    if not database.exists():
-        return False
-    store = open_record_store(database)
+def _is_exposed_copy(path):
+    """True when a recorded entry is this runtime's own exposure copy."""
+    home = bin_home()
+    if path.parent == home:
+        return True
+    # The exposure directory may have been moved through VESRYN_BIN_HOME
+    # since the registration; the recorded path is still our own copy.
+    return path.parent.name == home.name and path.parent.parent == home.parent
+
+
+def _same_entry(resolved, recorded):
+    """True when the shell resolves exactly the recorded artifact."""
+    if not recorded:
+        return True
     try:
-        row = store._db.execute(
-            "SELECT tool_id FROM tool_install WHERE entry = ?",
-            (str(target),),
-        ).fetchone()
-        return row is not None and row[0] == tool_id
-    finally:
-        store.close()
+        return os.path.normcase(os.path.abspath(resolved)) == os.path.normcase(
+            os.path.abspath(recorded)
+        )
+    except OSError, ValueError:
+        return False
+
+
+def _uv_package(tool_id, fallback):
+    """The uv package name for a tool; the command is not always it."""
+    from .record_sources import bundled_records
+
+    for record in bundled_records():
+        if isinstance(record, ToolAsset) and record.tool_id == tool_id:
+            return record.package or tool_id
+    return fallback
 
 
 def _register(
@@ -573,9 +663,10 @@ def refresh_tools(root=None, environ=None):
     """Regenerate tools.json from the registration facts — explicit rebuild.
 
     Only registrations whose command currently resolves in the target shell
-    are listed; entry-not-ready tools stay registered but unlisted. Returns
-    the number of entries written; a write failure raises ``HostToolError``
-    with ``list_not_written``.
+    AND resolves to the registered artifact are listed; a same-name entry
+    from elsewhere is not the verified tool, and an entry-not-ready tool
+    stays registered but unlisted. Returns the number of entries written; a
+    write failure raises ``HostToolError`` with ``list_not_written``.
     """
     environ = os.environ if environ is None else environ
     root = user_data_root() if root is None else Path(root)
@@ -597,7 +688,12 @@ def refresh_tools(root=None, environ=None):
         # Only entries the target shell actually resolves are listed; a
         # registered native payload whose PATH is not prepared stays
         # registered but unlisted (entry is a recorded fact, not exposure).
-        if _which(command, environ) is None:
+        resolved = _which(command, environ)
+        if resolved is None:
+            continue
+        # The shell must resolve the REGISTERED artifact: a same-name
+        # command from elsewhere is not the tool that was verified.
+        if not _same_entry(resolved, entry):
             continue
         seen.add(command)
         entries.append({"command": command, "description": description})
@@ -610,7 +706,8 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", runner=subprocess.run):
     """Remove the registration and (for uv tools) the installed environment.
 
     Native payloads stay in the existing asset store — this path does not
-    delete verified artifacts. The shared list is refreshed afterwards.
+    delete verified artifacts; only this runtime's own exposure copy in the
+    exposure directory is removed. The shared list is refreshed afterwards.
     """
     root = user_data_root() if root is None else Path(root)
     database = tools_database(root)
@@ -619,39 +716,31 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", runner=subprocess.run):
     store = open_record_store(database)
     try:
         row = store._db.execute(
-            "SELECT prepared_via, command FROM tool_install WHERE tool_id = ?",
+            "SELECT prepared_via, command, entry FROM tool_install WHERE tool_id = ?",
             (tool_id,),
         ).fetchone()
         if row is None:
             raise HostToolError("not_registered", tool_id)
-        prepared_via, command = row
+        prepared_via, command, entry = row
         store._db.execute("DELETE FROM tool_install WHERE tool_id = ?", (tool_id,))
         store._db.commit()
     finally:
         store.close()
     if prepared_via == "uv":
         runner(
-            [uv, "tool", "uninstall", command],
+            [uv, "tool", "uninstall", _uv_package(tool_id, command)],
             stdin=subprocess.DEVNULL,
             capture_output=True,
             text=True,
             timeout=120,
             check=False,
         )
-    elif prepared_via == "aria2":
+    elif prepared_via == "aria2" and entry:
         # Remove this tool's own exposed copy; the verified payload stays
         # in the asset store.
-        try:
-            store = open_record_store(database)
-            entry = store._db.execute(
-                "SELECT entry FROM tool_install WHERE tool_id = ?", (tool_id,)
-            ).fetchone()
-        finally:
-            store.close()
-        if entry and entry[0]:
-            exposed = Path(entry[0])
-            if exposed.parent == bin_home():
-                exposed.unlink(missing_ok=True)
+        exposed = Path(entry)
+        if _is_exposed_copy(exposed):
+            exposed.unlink(missing_ok=True)
     refresh_tools(root=root)
     return {"status": "uninstalled", "tool_id": tool_id, "command": command}
 

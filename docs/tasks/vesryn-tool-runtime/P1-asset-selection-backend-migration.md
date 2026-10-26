@@ -43,9 +43,10 @@ Agent list:
 - **Strict Agent list**: `tools.json` contains exactly `command` +
   `description`; the description is this task's independent one-liner (from
   the default list or explicit input), never the retrieval summary. Only
-  commands the target shell actually resolves are listed — a registered
-  native payload whose PATH is not yet prepared stays registered but
-  unlisted, and a later `refresh_tools` lists it once the host exposes it.
+  commands the target shell resolves TO the registered artifact are listed —
+  a registered native payload whose PATH is not yet prepared stays
+  registered but unlisted, and a later `refresh_tools` lists it once the
+  host exposes it; a same-name command from elsewhere is never listed.
   Python libraries/pytest plugins (no standalone CLI) and OCI-only records
   (no host install) are never listed as callable.
 - **Root resolution**: `user_data_root()` — `VESRYN_TOOLS_HOME` overrides;
@@ -101,10 +102,11 @@ superseded).
   replacement), so re-preparation after the declaration grows no longer
   fails with duplicate_tool_id.
 - **Probe-first ordering**: prepare_tool probes the target shell before
-  release matching — an entry whose reported version matches any declared
-  release is reused as-is (rg manually upgraded by the owner to 15.2.0 →
-  reused, source_verified=false), and the earlier rg 15.1.0 mismatch was
-  honestly reported as a conflict, never overwritten.
+  release matching — an entry that reports the SELECTED version is reused
+  as-is (rg manually upgraded by the owner to 15.2.0 → reused,
+  source_verified=false); an entry of another version is an honest
+  conflict, never overwritten and never registered under the selected
+  version.
 - **~/.vesryn/bin exposure**: non-uv entries are exposed by copying the
   verified payload executable into ~/.vesryn/bin (VESRYN_BIN_HOME
   overrides); identical bytes are idempotent, different bytes are
@@ -117,3 +119,36 @@ superseded).
   vulture); the five new entries appear once ~/.vesryn/bin is on PATH
   (host-side; the runtime never modifies PATH itself). memray stays
   excluded honestly — upstream publishes Linux/macOS only.
+
+## 2026-10-26 review fixes (issue #33 acceptance re-audit)
+
+The issue's acceptance list was re-audited against the code on this branch.
+PR #37 carries no inline review comments on GitHub, so the findings below were
+re-derived from the issue criteria and the delivered behaviour; each one is
+now a directed test.
+
+| # | Defect | Fix |
+| --- | --- | --- |
+| 1 | Reuse ignored the SELECTED version: `prepare_tool("vulture", version="2.16")` on a host reporting 2.14 returned `reused` and registered 2.14 | reuse requires the selected version; a mismatch is a `conflict` that reports what the entry actually shows |
+| 2 | Version matching was a substring test — "2.0.0" matched "hyperfine 12.0.0" | versions are matched as whole tokens (`packaging.version` equality, so "2.16" == "2.16.0") |
+| 3 | After `uv tool install` the probed version was discarded: a shadowing 2.14 entry was registered as 2.16 with `source_verified=true` | the resolved entry is re-probed and must report the selected version, else `conflict` with no registration |
+| 4 | `uninstall_tool` never removed the exposure copy — the row was deleted before the entry was read back | the entry is read before the delete; an aria2 registration's own copy in the exposure directory is removed (the verified payload stays) |
+| 5 | `uninstall_tool` ran `uv tool uninstall <command>` — wrong name for `import-linter` (command `lint-imports`) | the uv PACKAGE name is resolved from the declaration; the command is only the fallback |
+| 6 | `_expose_native_entry` ignored the environ it was handed and wrote into the real `~/.vesryn/bin` | the exposure directory comes from the target environment (`VESRYN_BIN_HOME`) |
+| 7 | `tools.json` listed any same-name command that resolved, not the registered artifact | a registration is listed only when the shell resolves exactly the recorded entry; a same-name binary elsewhere is not listed |
+| 8 | The native path leaked raw `AssetError`/`StopIteration` instead of stable host reasons | `no_preparation_definition`, `no_preparation_release`, `invalid_backend`, `native_prepare_failed` |
+| 9 | The default list shipped at `vesryn_tool_runtime/default-tools.json`; the issue contracts `vesryn_tool_runtime/data/default-tools.json` and the `data-include` glob pointed at a directory that did not exist | the resource moved to `data/default-tools.json`; the wheel ships `vesryn_tool_runtime/data/default-tools.json` |
+| 10 | Dead and duplicated code: an unreachable second probe branch, an unused `_owned_by` helper, an unused parameter, and a `PREPARE_STATUSES` constant that did not match the statuses actually returned | removed; the constant now lists the returned statuses |
+| 11 | A `.bat`/`.cmd` entry in a path with spaces was probed with an unquoted `cmd /c` line | the command line is quoted for `cmd.exe` |
+
+Verification after the fixes: `tests/test_host_tools.py` 19 passed; full suite
+188 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
+on this Windows host); `ruff check` and `ruff format --check` clean; the built
+wheel ships `vesryn_tool_runtime/data/default-tools.json` and
+`default_tools()` resolves it from the installed layout.
+
+The host registry was checked read-only: all 15 registrations still resolve to
+their recorded artifacts, so the stricter list rule keeps the current nine
+entries. A `refresh_tools()` run on the host adds the six native entries
+(`actionlint`, `hyperfine`, `osv-scanner`, `shellcheck`, `trivy`, `zizmor`)
+that are registered and now exposed through `~/.vesryn/bin`.
