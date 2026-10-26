@@ -106,6 +106,45 @@ def test_public_tool_view_checks_the_actual_environment_and_entry(tmp_path):
     assert any("--show-with" in argv and "--show-paths" in argv for argv in calls)
 
 
+@pytest.mark.parametrize(
+    "mutation", ["prefix", "python", "main-version", "duplicate", "inventory"]
+)
+def test_public_tool_view_rejects_wrong_or_incomplete_environment_evidence(
+    tmp_path, mutation
+):
+    from vesryn_tool_runtime._uv_tool_packages import inspect_uv_tool
+
+    home = tmp_path / "tools"
+    python = home / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    facts = {
+        "python": str(python),
+        "prefix": str(home),
+        "python_version": "3.14.3",
+        "packages": [{"name": "sphinx", "version": "9.2.0"}],
+    }
+    if mutation == "prefix":
+        facts["prefix"] = str(tmp_path / "project-env")
+    elif mutation == "python":
+        facts["python"] = str(tmp_path / "project-env/python.exe")
+    elif mutation == "main-version":
+        facts["packages"][0]["version"] = "8.0.0"
+    elif mutation == "duplicate":
+        facts["packages"].append(dict(facts["packages"][0]))
+    else:
+        facts["packages"] = None
+
+    def runner(argv, **kwargs):
+        output = (
+            f"sphinx v9.2.0 ({home})\n- {tmp_path / 'sphinx-build'}\n"
+            if "list" in argv
+            else json.dumps(facts)
+        )
+        return subprocess.CompletedProcess(argv, 0, output, "")
+
+    with pytest.raises((ValueError, TypeError)):
+        inspect_uv_tool("uv", "sphinx", environ={}, runner=runner)
+
+
 @pytest.fixture
 def uv_case(tmp_path, monkeypatch):
     from test_uv_assets import wheel
@@ -277,3 +316,33 @@ def test_unverifiable_post_install_state_never_registers_success(uv_case):
         uv_case["prepare"](("vtr-plugin==1.0",), runner=runner)
     assert caught.value.code == "environment_unverified"
     assert not tools_database(uv_case["root"]).exists()
+
+
+def test_dependency_check_failure_never_registers_success(uv_case):
+    def runner(argv, **kwargs):
+        if "pip" in argv and "check" in argv:
+            return subprocess.CompletedProcess(argv, 1, "", "dependency mismatch")
+        return uv_case["runner"](argv, **kwargs)
+
+    with pytest.raises(HostToolError) as caught:
+        uv_case["prepare"](("vtr-plugin==1.0",), runner=runner)
+    assert caught.value.code == "environment_unverified"
+    assert not tools_database(uv_case["root"]).exists()
+
+
+def test_shadowing_entry_is_not_admitted_by_another_valid_uv_environment(
+    uv_case, tmp_path
+):
+    from test_host_tools import make_command
+
+    original = uv_case["prepare"](("vtr-plugin==1.0",))
+    before = tools_json(uv_case["root"]).read_bytes()
+    installs = len(_installs(uv_case))
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    make_command(foreign, "vtr-cli", "vtr-cli 1.0")
+    uv_case["environ"]["PATH"] = str(foreign) + os.pathsep + uv_case["environ"]["PATH"]
+    result = uv_case["prepare"](("vtr-plugin==1.0",))
+    assert result["status"] == "conflict" and result["entry"] != original["entry"]
+    assert len(_installs(uv_case)) == installs
+    assert tools_json(uv_case["root"]).read_bytes() == before
