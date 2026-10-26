@@ -147,6 +147,7 @@ now a directed test.
 | 16 | An empty target PATH fell back to the host's PATH | an empty PATH resolves nothing |
 | 17 | `tools.json` was written through a fixed temp name, so concurrent writers collided | a unique temp name in the same directory |
 | 18 | The declaration had no windows x86_64 ripgrep release although this record claimed one — `prepare_tool("ripgrep")` raised `missing_release` on this host | the official `ripgrep-15.2.0-x86_64-pc-windows-msvc.zip` release was added with the publisher digest (`71b2fef8…`) taken from the GitHub release metadata; the committed demo library was regenerated from schema+seed |
+| 19 | The `AssetSelection` construction validates that the legacy release matches the target; its `invalid_selection` was raised outside the guarded block and still leaked a raw `AssetError` | the selection is built inside the guard, so every native failure is a stable host reason |
 
 Verification after the fixes: `tests/test_host_tools.py` 24 passed; full suite
 193 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
