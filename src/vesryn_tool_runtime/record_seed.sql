@@ -401,6 +401,41 @@ VALUES
    '{"input_schema": {"type": "object"}, "output_schema": {"type": "object"}}',
    'Sample and generate flamegraph profiling records for Python processes');
 
+-- Tach: architecture and module boundary enforcement
+INSERT INTO tool_asset (tool_id, name, provider, package, entrypoint) VALUES
+  ('tach', 'tach', 'uv', 'tach', 'tach');
+
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('tach', '0.35.3', 'windows', 'x86_64', 'msvc',
+   '>=3.10',
+   'https://files.pythonhosted.org/packages/9d/45/7eee8d2f77060b0ee7b9252ccc351e610556df3bf46001d8684b22220f7b/tach-0.35.3-cp37-abi3-win_amd64.whl',
+   'sha256',
+   '1be24413f34fdbca85a137bc7f7904ae92f928b30aa9137e69b52ad0f7fb8237'),
+  ('tach', '0.35.3', 'linux', 'x86_64', 'gnu',
+   '>=3.10',
+   'https://files.pythonhosted.org/packages/e0/52/351847518d94cc736d937b26540c46720ff25ac411c64c3ac80f5e4eb1ce/tach-0.35.3-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl',
+   'sha256',
+   'a0f73de7012495877497b781c571208ed6352cf579f400c83165ce4558b9b23e');
+
+INSERT INTO tool_group_member (group_id, tool_id, summary) VALUES
+  ('ci-quality', 'tach', 'Fast architecture and module boundary enforcement tool for Python');
+
+INSERT INTO tool_group_member_alias (group_id, tool_id, alias) VALUES
+  ('ci-quality', 'tach', 'tach'),
+  ('ci-quality', 'tach', 'architecture'),
+  ('ci-quality', 'tach', 'boundaries');
+
+INSERT INTO tool_access
+  (access_id, tool_id, method, target, contract, summary)
+VALUES
+  ('tach.check', 'tach', 'uv', 'tach check',
+   '{"input_schema": {"type": "object"}, "output_schema": {"type": "object"}}',
+   'Check Python dependency boundaries and architecture rules');
+
+
 -- Migrated from the retired shared_assets declarations (issue #32).
 -- Sources/digests are the verified publisher values; the old JSON
 -- files are historical inputs, not a second live source.
@@ -416,7 +451,12 @@ VALUES
    NULL,
    'https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-pc-windows-msvc.zip',
    'sha256',
-   'e4abca10c3a64ebea742667dd7009449d49403db5460dd6873e389fa2945360f');
+   'e4abca10c3a64ebea742667dd7009449d49403db5460dd6873e389fa2945360f'),
+  ('ripgrep', '15.2.0', 'windows', 'x86_64', 'msvc',
+   NULL,
+   'https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip',
+   'sha256',
+   '71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5');
 
 INSERT INTO tool_asset (tool_id, name, provider, package, entrypoint) VALUES
   ('hyperfine', 'hyperfine', 'github-release', NULL, 'hyperfine');
@@ -584,3 +624,42 @@ VALUES
    'https://files.pythonhosted.org/packages/a0/56/0cc15b8ff2613c1d5c3dc1f3f576ede1c43868c1bc2e5ccaa2d4bcd7974d/vulture-2.14-py2.py3-none-any.whl',
    'sha256',
    'd9a90dba89607489548a49d557f8bac8112bd25d3cbc8aeef23e860811bd5ed9');
+
+-- Windows x86_64 releases: verified against official GitHub Release
+-- metadata on 2026-10-25 (issue #33 host preparation; this host's targets).
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('trivy', '0.76.1', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_windows-64bit.zip',
+   'sha256',
+   '1051f49cb22d5284f43425f72aad9cda63ca12ceb92e7caa06903490c82dc9bf'),
+  ('actionlint', '1.7.12', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_windows_amd64.zip',
+   'sha256',
+   '6e7241b51e6817ea6a047693d8e6fed13b31819c9a0dd6c5a726e1592d22f6e9'),
+  ('shellcheck', '0.11.0', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip',
+   'sha256',
+   '8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e'),
+  ('zizmor', '1.31.1', 'windows', 'x86_64', 'msvc', NULL,
+   'https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-x86_64-pc-windows-msvc.zip',
+   'sha256',
+   '4de30371c8a3b483aecbcf0dec1fd6a2b6aae65051ca226b4f6527baac6a8c7a'),
+  ('osv-scanner', '2.6.0', 'windows', 'x86_64', NULL, NULL,
+   'https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_windows_amd64.exe',
+   'sha256',
+   'e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6');
+
+-- deptry windows x86_64 wheel: verified against official PyPI metadata
+-- on 2026-10-25 (issue #33 host preparation on a windows host). The wheel is
+-- a win_amd64 build: it states the MSVC runtime, not a glibc ABI.
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('deptry', '0.25.1', 'windows', 'x86_64', 'msvc', '>=3.10',
+   'https://files.pythonhosted.org/packages/7a/6a/3f82f7a06217778282bc4456af1b4ffb3bc4b2c8e7891d00e8323f9ad0b8/deptry-0.25.1-cp310-abi3-win_amd64.whl',
+   'sha256',
+   'b59a560cb7dffb21832a98bb80d33d614cfb5630ea36ce21833eabf4eae3df99');

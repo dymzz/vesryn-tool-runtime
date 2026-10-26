@@ -64,11 +64,22 @@ def _wheel_libc(release):
     return None
 
 
+def host_platform(platform_=None):
+    """The host's (os, arch) in the RECORD vocabulary.
+
+    The records speak ``windows``/``linux``/``macos``; the interpreter speaks
+    ``win32``/``linux``/``darwin``. Both spellings are accepted, so a caller
+    that states a target platform resolves it the same way the records do.
+    """
+    value = sys.platform if platform_ is None else platform_
+    os_name = _HOST_OS.get(value)
+    if os_name is None and value in ("windows", "linux", "macos"):
+        os_name = value
+    return os_name, _HOST_ARCH.get(platform.machine().lower())
+
+
 def _host():
-    return (
-        _HOST_OS.get(sys.platform),
-        _HOST_ARCH.get(platform.machine().lower()),
-    )
+    return host_platform()
 
 
 def _same_version(left, right):

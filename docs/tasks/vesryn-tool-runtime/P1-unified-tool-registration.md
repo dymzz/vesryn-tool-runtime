@@ -29,7 +29,7 @@ it exactly (asserted by test).
 | provider mapping | uv→uv; github releases→github-release; oci digest refs→oci |
 | old `asset_id` | never a second tool primary key: bare canonical names are used (`cli.ripgrep`→`ripgrep`); the historical capability mapping (`python.dead-code`→vulture, `python.typecheck`→pyright, `python.dependency-hygiene`→deptry, `python.duplicate-code`→pylint, `dependency.vulnerability-scan`→osv-scanner, `code.pattern-scan`→semgrep, `docs.link-check`→lychee) is recorded here, not encoded as fake entries |
 | placeholders | none: no empty ToolSpec, no example.* capability, no fabricated Adapter/Binding/entry — asset-only registration is used where no real call contract exists |
-| pytest-timeout / pytest-randomly / pytest-xdist / beartype / pytest-cov / typeguard / memray / py-spy | registered by the owner's parallel session onto the seed during this task; each URL/SHA re-verified against PyPI here (all match) and carried in the delivered declaration |
+| pytest-timeout / pytest-randomly / pytest-xdist / beartype / pytest-cov / typeguard / memray / py-spy / tach (0.35.3 wheel+sdist, URL/SHA verified) | registered by the owner's parallel session onto the seed during this task; each URL/SHA re-verified against PyPI here (all match) and carried in the delivered declaration |
 
 Known unexpressed detail (listed per task book): the per-OS entrypoint
 suffix (hyperfine's Windows `hyperfine.exe`) is not a record field — the

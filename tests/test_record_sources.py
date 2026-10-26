@@ -26,18 +26,18 @@ COMMITTED_LIBRARY = Path(__file__).resolve().parents[1] / "data" / "records.sqli
 # Verified publisher values the live declaration must carry (previously
 # pinned per JSON document; the seed is now the single pinning place).
 EXPECTED_TOOLS = {
-    "trivy": ("github-release", 1),
+    "trivy": ("github-release", 2),
     "vulture": ("uv", 2),
     "hyperfine": ("github-release", 4),
-    "ripgrep": ("github-release", 1),
-    "osv-scanner": ("github-release", 1),
-    "actionlint": ("github-release", 1),
-    "shellcheck": ("github-release", 1),
-    "zizmor": ("github-release", 1),
+    "ripgrep": ("github-release", 2),
+    "osv-scanner": ("github-release", 2),
+    "actionlint": ("github-release", 2),
+    "shellcheck": ("github-release", 2),
+    "zizmor": ("github-release", 2),
     "semgrep": ("oci", 2),
     "lychee": ("oci", 2),
     "pyright": ("uv", 1),
-    "deptry": ("uv", 1),
+    "deptry": ("uv", 2),
     "pylint": ("uv", 1),
     "import-linter": ("uv", 1),
     "hypothesis": ("uv", 2),
@@ -51,6 +51,7 @@ EXPECTED_TOOLS = {
     "pytest-cov": ("uv", 1),
     "memray": ("uv", 2),
     "py-spy": ("uv", 2),
+    "tach": ("uv", 2),
 }
 VULTURE_214_URL = (
     "https://files.pythonhosted.org/packages/a0/56/0cc15b8ff2613c1d5c3"

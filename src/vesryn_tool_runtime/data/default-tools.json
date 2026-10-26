@@ -1,0 +1,14 @@
+[
+  {
+    "tool_id": "vulture",
+    "version": "2.16",
+    "command": "vulture",
+    "description": "检测 Python 无用代码"
+  },
+  {
+    "tool_id": "hyperfine",
+    "version": "2.0.0",
+    "command": "hyperfine",
+    "description": "命令行基准测试计时"
+  }
+]

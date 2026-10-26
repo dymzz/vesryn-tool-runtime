@@ -82,11 +82,64 @@ class AssetTable:
     def __init__(self, db):
         self._db = db
 
-    def put(self, asset):
+    def put(self, asset, *, sync=False):
+        """Insert an asset; with sync=True an existing tool row is updated
+        to the given content (header fields must match, releases are
+        replaced) — for syncing a derived store to its declaration."""
         if not isinstance(asset, ToolAsset):
             raise RecordError("invalid_record")
         try:
             with self._db:
+                if sync:
+                    existing = self.get(asset.tool_id)
+                    if (
+                        existing.name,
+                        existing.provider,
+                        existing.package,
+                        existing.entrypoint,
+                    ) != (
+                        asset.name,
+                        asset.provider,
+                        asset.package,
+                        asset.entrypoint,
+                    ):
+                        raise RecordError("duplicate_tool_id")
+                    self._db.execute(
+                        "UPDATE tool_asset SET name = ?, provider = ?,"
+                        " package = ?, entrypoint = ? WHERE tool_id = ?",
+                        (
+                            asset.name,
+                            asset.provider,
+                            asset.package,
+                            asset.entrypoint,
+                            asset.tool_id,
+                        ),
+                    )
+                    self._db.execute(
+                        "DELETE FROM tool_release WHERE tool_id = ?",
+                        (asset.tool_id,),
+                    )
+                    self._db.executemany(
+                        "INSERT INTO tool_release"
+                        " (tool_id, version, platform_os, platform_arch,"
+                        " platform_abi, platform_python, source, digest_type,"
+                        " digest) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        [
+                            (
+                                asset.tool_id,
+                                item.version,
+                                item.platform.os if item.platform else None,
+                                item.platform.arch if item.platform else None,
+                                item.platform.abi if item.platform else None,
+                                item.python,
+                                item.source,
+                                item.digest_type,
+                                item.digest,
+                            )
+                            for item in asset.versions
+                        ],
+                    )
+                    return
                 insert_asset(self._db, asset)
         except sqlite3.IntegrityError as error:
             _translate(error, "duplicate_tool_id")

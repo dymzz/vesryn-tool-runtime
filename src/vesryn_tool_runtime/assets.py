@@ -8,7 +8,7 @@ from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
 
 from .documents import ToolRuntimeError, digest
-from .schemas import NAME, TOOL, validate
+from .schemas import NAME, validate
 
 
 class AssetError(ToolRuntimeError):
@@ -205,7 +205,10 @@ class AssetPolicy:
 class AssetSelection:
     tool_id: str
     provider: str | None
-    tool_contract_sha256: str
+    # Present only when a real capability contract backs the selection;
+    # host CLI preparation (issue #33) selects by tool identity and never
+    # fabricates one.
+    tool_contract_sha256: str | None
     asset_id: str
     catalog_revision: str
     definition_sha256: str
@@ -216,12 +219,14 @@ class AssetSelection:
     specifier: str = ""
 
     def __post_init__(self):
-        validate(self.tool_id, TOOL, label="asset capability")
+        # Tool primary keys: bare program identities or real capability IDs.
+        _token(self.tool_id)
         for value in (self.asset_id, self.catalog_revision):
             _token(value)
         if self.provider is not None:
             validate(self.provider, NAME, label="asset capability Provider")
-        _sha256(self.tool_contract_sha256)
+        if self.tool_contract_sha256 is not None:
+            _sha256(self.tool_contract_sha256)
         _sha256(self.definition_sha256)
         if not isinstance(self.target, AssetTarget) or not isinstance(
             self.policy, AssetPolicy
@@ -254,6 +259,8 @@ class AssetSelection:
 
     def document(self):
         value = {"schema_version": 1, "kind": "tool-asset-selection", **asdict(self)}
+        if value["tool_contract_sha256"] is None:
+            del value["tool_contract_sha256"]
         value["selection_id"] = digest(value)
         return value
 
@@ -283,6 +290,7 @@ class AssetSelection:
                     "target": AssetTarget(**value["target"]),
                     "policy": AssetPolicy(**value["policy"]),
                     "release": AssetRelease(**value["release"]),
+                    "tool_contract_sha256": value.get("tool_contract_sha256"),
                 }
             )
         except TypeError, KeyError, ValueError:

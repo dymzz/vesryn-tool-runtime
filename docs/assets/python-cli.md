@@ -127,6 +127,20 @@ creates a capability and grants no install or execution right.
   declared, because only the Linux x86_64 target is covered by the current evidence.
   Windows/macOS/ARM verification is therefore `not_verified` for deptry.
 
+## The live record declaration (issue #33)
+
+The live declaration — `src/vesryn_tool_runtime/record_seed.sql`, the source the
+host-preparation path reads — carries one MORE deptry release: the Windows
+x86_64 wheel `deptry-0.25.1-cp310-abi3-win_amd64.whl`, with the publisher's
+SHA-256 taken from PyPI and verified again against the publisher's own bytes
+before that artifact is ever installed. Its ABI is `msvc` — it is a `win_amd64`
+build and states no glibc constraint; the Linux wheel keeps `abi: gnu`. The
+shared asset definition described above is unchanged and still Linux-only.
+
+A Windows wheel built for the stable ABI needs a GIL-enabled interpreter: on a
+free-threaded host the install of that wheel fails unless the interpreter is
+named (see the issue #33 delivery record).
+
 ## Verification
 
 - Group test: `tests/test_shared_assets_python.py` (offline; identities, assembly,

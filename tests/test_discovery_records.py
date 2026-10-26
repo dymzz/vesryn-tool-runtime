@@ -529,7 +529,7 @@ def test_constraint_stripped_databases_are_refused(tmp_path):
         "CREATE TABLE tool_access (access_id TEXT, tool_id TEXT, method TEXT,"
         " target TEXT, contract TEXT, summary TEXT);"
     )
-    db.execute("PRAGMA user_version = 2")
+    db.execute("PRAGMA user_version = 3")
     db.commit()
     db.close()
     with pytest.raises(RecordError, match="schema_drift"):
@@ -554,10 +554,11 @@ def test_committed_library_round_trips_the_seeded_examples():
 
     asset = handle.assets.get("trivy")
     assert (asset.provider, asset.entrypoint) == ("github-release", "trivy")
-    (release,) = asset.versions
-    assert release.version == "0.76.1"
-    assert (release.platform.os, release.platform.arch) == ("linux", "x86_64")
-    assert release.digest == (
+    assert len(asset.versions) == 2
+    linux = next(item for item in asset.versions if item.platform.os == "linux")
+    assert linux.version == "0.76.1"
+    assert (linux.platform.os, linux.platform.arch) == ("linux", "x86_64")
+    assert linux.digest == (
         "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
     )
 

@@ -49,6 +49,14 @@ from .discovery_records import (
     record_from_document,
 )
 from .documents import ToolRuntimeError
+from .host_tools import (
+    HostToolError,
+    default_tools,
+    prepare_tool,
+    refresh_tools,
+    uninstall_tool,
+    user_data_root,
+)
 from .invocation import DispatchReceipt, ToolRuntime, checked_result, invoke_tool
 from .native_assets import Aria2NativeBackend, Aria2Source, NativeAssetDelivery
 from .record_sources import (
@@ -86,6 +94,7 @@ __all__ = [
     "DispatchReceipt",
     "ExecutionContext",
     "GroupMember",
+    "HostToolError",
     "Invocation",
     "NativeAssetDelivery",
     "Platform",
@@ -108,13 +117,18 @@ __all__ = [
     "compose",
     "compose_catalog",
     "create_binding",
+    "default_tools",
     "invoke_tool",
     "legacy_preparation_definitions",
     "native_asset_directory",
     "open_record_store",
+    "prepare_tool",
     "provider",
     "record_document",
     "record_from_document",
+    "refresh_tools",
+    "uninstall_tool",
+    "user_data_root",
     "verify_binding",
     "verify_document",
 ]
