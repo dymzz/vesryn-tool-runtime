@@ -362,7 +362,9 @@ def prepare_tool(
         # Ownership and verification stay as they were recorded: a tool the
         # runtime installed keeps its installation owner, and a re-probe
         # never rewrites the verification fact of that same artifact.
-        prepared_via, source_verified = _existing_ownership(asset.tool_id, entry, root)
+        prepared_via, source_verified = _existing_ownership(
+            asset.tool_id, matched, entry, root
+        )
         return _register(
             root,
             asset,
@@ -782,14 +784,17 @@ def _uv_package(tool_id, fallback):
     return fallback
 
 
-def _existing_ownership(tool_id, entry, root):
+def _existing_ownership(tool_id, version, entry, root):
     """The recorded owner and verification state of an already-registered entry.
 
     A tool this runtime installed keeps that installation owner when it is
     prepared again, so the uninstall path still knows what it manages. The
     verification fact of that same artifact is not rewritten by a re-probe.
-    An entry the runtime never registered is an external reuse: no owner, no
-    upstream evidence.
+
+    Those facts belong to ONE artifact: the recorded VERSION at that entry.
+    The same path carrying another version is another artifact — the runtime
+    never downloaded nor verified it — so the earlier registration says
+    nothing about it and the entry stays an honest external reuse.
     """
     database = tools_database(root)
     if not database.exists():
@@ -798,8 +803,8 @@ def _existing_ownership(tool_id, entry, root):
     try:
         row = store._db.execute(
             "SELECT prepared_via, source_verified FROM tool_install"
-            " WHERE tool_id = ? AND entry = ?",
-            (tool_id, str(entry)),
+            " WHERE tool_id = ? AND version = ? AND entry = ?",
+            (tool_id, str(version), str(entry)),
         ).fetchone()
     finally:
         store.close()

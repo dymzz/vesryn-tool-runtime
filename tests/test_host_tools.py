@@ -531,6 +531,52 @@ def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
     assert again["prepared_via"] == "uv"
 
 
+def test_a_switched_version_does_not_inherit_the_verification_state(env, monkeypatch):
+    """The verification fact belongs to ONE artifact: the recorded version.
+
+    The same path carrying another version is another artifact — the
+    earlier registration's owner and verification state do not carry over,
+    and the entry is recorded as an honest external reuse.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    artifact = env["root"] / "artifact" / "vulture-2.16-py3-none-any.whl"
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    artifact.write_bytes(b"verified wheel")
+    monkeypatch.setattr(
+        host_tools, "_verified_artifact", lambda asset, release, **kwargs: artifact
+    )
+
+    def installing_uv(argv, **kwargs):
+        if "tool" in argv:
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    installed = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert installed["status"] == "installed"
+    assert installed["source_verified"] is True
+
+    # The entry now reports a DIFFERENT version: the same path, another
+    # artifact, which the runtime never downloaded nor verified.
+    make_command(env["bin"], "vulture", "vulture 2.14")
+    switched = prepare_tool(
+        "vulture",
+        version="2.14",
+        root=env["root"],
+        environ=env["environ"],
+        runner=run_real,
+    )
+    assert switched["status"] == "reused"
+    assert switched["source_verified"] is False
+    assert switched["prepared_via"] == "external"
+
+
 def test_a_failed_uninstall_keeps_the_registration(env, monkeypatch):
     """A failing backend is not a completed uninstall."""
     from vesryn_tool_runtime import host_tools

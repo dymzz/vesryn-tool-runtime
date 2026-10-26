@@ -166,9 +166,10 @@ now a directed test.
 | 31 | The artifact download wrote through a fixed `<name>.part` file: two concurrent downloads of the same artifact wrote into one file, the bytes interleaved and both verifications failed | a unique temp name in the same directory (the pattern the shared list already uses), and the partial file is removed on every failure path |
 | 32 | The declaration's deptry Windows release carried `abi: gnu` — copied from the manylinux row — so the host (windows → msvc) could not select it at all; it was the only Windows row in the whole declaration with a glibc ABI | the row states `abi: msvc`, like the other Windows wheels (py-spy, tach); the publisher digest was re-verified against the publisher's own bytes before the correction, and the committed demo library was rebuilt from schema+seed |
 | 33 | The tool environment's interpreter was left to the backend: uv picks one on its own, and on a free-threaded host that pick cannot load the stable-ABI (abi3) wheels publishers ship — the install failed with "the wheel was built for the stable ABI, which requires a GIL-enabled interpreter" | the interpreter is NAMED: the running one when it can load the artifact, otherwise a GIL-enabled interpreter of the same version from the target PATH; a host with neither reports `interpreter_unavailable` instead of a backend dump |
+| 34 | The recorded owner and verification state were inherited by (tool, entry) alone: after a version switch, the new version's registration inherited the OLD version's `source_verified=true` and its installation owner — a version the runtime never downloaded nor verified | the facts belong to ONE artifact: the recorded (tool, version, entry). A different version at the same path is another artifact, so it is recorded as an honest external reuse (`prepared_via=external`, `source_verified=0`) |
 
-Verification after the fixes: `tests/test_host_tools.py` 38 passed; full suite
-207 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
+Verification after the fixes: `tests/test_host_tools.py` 39 passed; full suite
+208 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
 on this Windows host); `ruff check` and `ruff format --check` clean; the built
 wheel ships `vesryn_tool_runtime/data/default-tools.json` and
 `default_tools()` resolves it from the installed layout.
