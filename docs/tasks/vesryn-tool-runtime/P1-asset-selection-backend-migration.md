@@ -148,7 +148,7 @@ now a directed test.
 | 17 | `tools.json` was written through a fixed temp name, so concurrent writers collided | a unique temp name in the same directory |
 | 18 | The declaration had no windows x86_64 ripgrep release although this record claimed one — `prepare_tool("ripgrep")` raised `missing_release` on this host | the official `ripgrep-15.2.0-x86_64-pc-windows-msvc.zip` release was added with the publisher digest (`71b2fef8…`) taken from the GitHub release metadata; the committed demo library was regenerated from schema+seed |
 
-Verification after the fixes: `tests/test_host_tools.py` 25 passed; full suite
+Verification after the fixes: `tests/test_host_tools.py` 24 passed; full suite
 193 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
 on this Windows host); `ruff check` and `ruff format --check` clean; the built
 wheel ships `vesryn_tool_runtime/data/default-tools.json` and
