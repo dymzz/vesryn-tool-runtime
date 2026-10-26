@@ -452,3 +452,112 @@ def test_probe_reads_an_entry_in_a_path_with_spaces(tmp_path):
     entry, shown = host_tools._probe("vulture", {"PATH": str(binroot)}, run_real)
     assert entry is not None
     assert "2.16" in (shown or "")
+
+
+def test_an_empty_target_path_resolves_nothing(env):
+    """An empty target PATH must not fall back to the host's PATH."""
+    from vesryn_tool_runtime import host_tools
+
+    make_command(env["bin"], "vulture", "vulture 2.16")
+    assert host_tools._which("vulture", {"PATH": ""}) is None
+
+
+def test_user_data_root_follows_the_target_environ(env):
+    """VESRYN_TOOLS_HOME comes from the target environment."""
+    make_command(env["bin"], "vulture", "vulture 2.16")
+    outcome = prepare_tool(
+        "vulture",
+        environ=env["environ"],
+        runner=run_real,
+    )
+    assert outcome["status"] == "reused"
+    assert tools_json(env["root"]).exists()
+
+
+def test_an_upgrade_replaces_our_own_exposed_copy(env):
+    """Our own previous copy is replaced; a foreign one is refused."""
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    exposed_dir = env["bin"] / "exposed"
+    exposed_dir.mkdir(parents=True, exist_ok=True)
+    exposed = exposed_dir / "hyperfine.exe"
+    exposed.write_bytes(b"old-bytes")
+    payload = env["root"] / "payload"
+    payload.mkdir(parents=True, exist_ok=True)
+    (payload / "hyperfine.exe").write_bytes(b"new-bytes")
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "hyperfine"
+    )
+    host_tools._register(
+        env["root"],
+        asset,
+        "hyperfine",
+        "2.0.0",
+        str(exposed),
+        "命令行基准测试计时",
+        "aria2",
+        reused=False,
+        source_verified=True,
+        status="installed",
+    )
+    entry = host_tools._expose_native_entry(
+        "hyperfine",
+        payload / "hyperfine.exe",
+        env["root"],
+        environ={"VESRYN_BIN_HOME": str(exposed_dir)},
+    )
+    assert entry.read_bytes() == b"new-bytes"
+
+
+def test_a_foreign_exposed_command_is_never_overwritten(env):
+    """A copy owned by another tool stays untouched."""
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    exposed_dir = env["bin"] / "exposed"
+    exposed_dir.mkdir(parents=True, exist_ok=True)
+    foreign = exposed_dir / "hyperfine.exe"
+    foreign.write_bytes(b"foreign-bytes")
+    payload = env["root"] / "payload"
+    payload.mkdir(parents=True, exist_ok=True)
+    (payload / "hyperfine.exe").write_bytes(b"our-bytes")
+    other = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    )
+    host_tools._register(
+        env["root"],
+        other,
+        "vulture",
+        "2.16",
+        str(foreign),
+        "检测 Python 无用代码",
+        "aria2",
+        reused=False,
+        source_verified=True,
+        status="installed",
+    )
+    with pytest.raises(HostToolError, match="entry_conflict"):
+        host_tools._expose_native_entry(
+            "hyperfine",
+            payload / "hyperfine.exe",
+            env["root"],
+            environ={"VESRYN_BIN_HOME": str(exposed_dir)},
+        )
+    assert foreign.read_bytes() == b"foreign-bytes"
+
+
+def test_the_list_write_leaves_no_temporary_file(env):
+    """The replacement file is unique and removed."""
+    from vesryn_tool_runtime import host_tools
+
+    path = env["root"] / "tools.json"
+    assert host_tools._atomic_write_json(path, [{"command": "vulture"}]) is True
+    assert read_json(path) == [{"command": "vulture"}]
+    assert sorted(p.name for p in env["root"].iterdir()) == ["tools.json"]

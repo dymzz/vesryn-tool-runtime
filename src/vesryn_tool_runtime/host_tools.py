@@ -27,6 +27,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from datetime import UTC, datetime
 from importlib.resources import files as resource_files
 from pathlib import Path
@@ -42,8 +43,10 @@ DEFAULT_TOOLS_RESOURCE = "data/default-tools.json"
 
 # The statuses an outcome document may carry. Everything else is raised as a
 # HostToolError with a stable code (missing_release, backend_required,
-# install_incomplete, uv_install_failed, entry_conflict, list_not_written,
-# not_registered, invalid_input, unknown_tool).
+# invalid_backend, native_prepare_failed, no_preparation_definition,
+# no_preparation_release, install_incomplete, uv_install_failed,
+# entry_conflict, list_not_written, not_registered, invalid_input,
+# unknown_tool).
 PREPARE_STATUSES = (
     "reused",
     "installed",
@@ -139,7 +142,8 @@ def _now():
 
 
 def _which(command, environ):
-    return shutil.which(command, path=environ.get("PATH") or None)
+    """Resolve a command in the TARGET shell; an empty PATH resolves nothing."""
+    return shutil.which(command, path=environ.get("PATH", ""))
 
 
 def _run_env(environ):
@@ -287,7 +291,7 @@ def prepare_tool(
     via ``refresh_tools``); nothing partial is reported as success.
     """
     environ = os.environ if environ is None else dict(environ)
-    root = user_data_root() if root is None else Path(root)
+    root = user_data_root(environ=environ) if root is None else Path(root)
     defaults = {item["tool_id"]: item for item in default_tools()}
     if tool_id in defaults:
         item = defaults[tool_id]
@@ -390,7 +394,7 @@ def prepare_tool(
         )
     executable, _version, sha256 = aria2
     try:
-        index = AssetIndex(asset_root(environ=environ))
+        index = AssetIndex(asset_root(environ=_run_env(environ)))
         backend = Aria2NativeBackend(
             index, aria2=Aria2Source(executable, _version, sha256)
         )
@@ -417,6 +421,11 @@ def prepare_tool(
             if item.version == release.version
             and item.os in {"any", release.platform.os}
             and item.arch in {"any", release.platform.arch}
+            and (
+                item.abi is None
+                or release.platform.abi is None
+                or item.abi == release.platform.abi
+            )
         ),
         None,
     )
@@ -451,7 +460,11 @@ def prepare_tool(
         ).executable
     except AssetError as error:
         raise HostToolError("native_prepare_failed", str(error)) from None
-    entry = str(_expose_native_entry(tool_id, Path(payload), root, environ=environ))
+    entry = str(
+        _expose_native_entry(
+            tool_id, Path(payload), root, environ=environ, platform=platform
+        )
+    )
     return _register(
         root,
         asset,
@@ -460,9 +473,13 @@ def prepare_tool(
         entry,
         description,
         "aria2",
+        # The backend's `reused` means the verified payload was already in
+        # the asset store (nothing was downloaded again) — a different fact
+        # from the external reuse above, where an existing command of
+        # unknown ownership was taken as-is.
         reused=receipt.outcome.reused,
         source_verified=True,
-        status="installed",
+        status="reused" if receipt.outcome.reused else "installed",
         environ=environ,
     )
 
@@ -484,18 +501,18 @@ def _uv_install(uv, asset, release, runner):
         )
 
 
-def _expose_native_entry(tool_id, payload, root, environ=None):
+def _expose_native_entry(tool_id, payload, root, environ=None, platform=None):
     """Copy the verified payload entry into ~/.vesryn/bin (the exposure
     directory for non-uv tools). The verified payload stays in the asset
     store. An existing file with IDENTICAL bytes is our own previous copy
     (idempotent re-exposure after a failed registration); different bytes
-    are an explicit conflict — unknown-ownership commands are never
-    overwritten."""
+    replace our OWN previous copy — an upgrade — while a file of unknown
+    ownership is an explicit conflict and is never overwritten."""
     import hashlib
 
     target = bin_home(environ) / Path(payload).name
     # A Windows entry must carry .exe or the shell cannot resolve it.
-    if sys_platform() == "windows" and target.suffix.lower() != ".exe":
+    if sys_platform(platform) == "windows" and target.suffix.lower() != ".exe":
         target = target.with_name(target.name + ".exe")
     if target.exists():
 
@@ -516,10 +533,12 @@ def _expose_native_entry(tool_id, payload, root, environ=None):
                     owner = row[0] if row else owner
                 finally:
                     store.close()
-            raise HostToolError(
-                "entry_conflict",
-                f"{target} is owned by {owner}",
-            )
+            if owner != tool_id:
+                raise HostToolError(
+                    "entry_conflict",
+                    f"{target} is owned by {owner}",
+                )
+            # Our own previous copy: an upgrade replaces it.
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(payload, target)
     return target
@@ -588,7 +607,10 @@ def _register(
             store.assets.put(asset)
         elif existing != asset:
             # The declaration gained releases; sync the derived row.
-            store.assets.put(asset, sync=True)
+            try:
+                store.assets.put(asset, sync=True)
+            except RecordError as error:
+                raise HostToolError("registration_failed", str(error)) from None
         store._db.execute(
             "INSERT OR REPLACE INTO tool_install"
             " (tool_id, command, version, entry, description, prepared_via,"
@@ -669,7 +691,7 @@ def refresh_tools(root=None, environ=None):
     write failure raises ``HostToolError`` with ``list_not_written``.
     """
     environ = os.environ if environ is None else environ
-    root = user_data_root() if root is None else Path(root)
+    root = user_data_root(environ=environ) if root is None else Path(root)
     database = tools_database(root)
     if not database.exists():
         raise HostToolError("not_registered", "no local registration database")
@@ -759,12 +781,16 @@ def _atomic_write_json(path, entries):
     path = Path(path)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = path.with_name(path.name + ".tmp")
-        temporary.write_text(
-            json.dumps(entries, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        handle, temporary = tempfile.mkstemp(
+            dir=path.parent, prefix=path.name + ".", suffix=".tmp"
         )
-        os.replace(temporary, path)
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as stream:
+                stream.write(json.dumps(entries, indent=2, sort_keys=True) + "\n")
+            os.replace(temporary, path)
+        except BaseException:
+            Path(temporary).unlink(missing_ok=True)
+            raise
         return True
     except OSError:
         return False

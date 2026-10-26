@@ -29,7 +29,7 @@ EXPECTED_TOOLS = {
     "trivy": ("github-release", 2),
     "vulture": ("uv", 2),
     "hyperfine": ("github-release", 4),
-    "ripgrep": ("github-release", 1),
+    "ripgrep": ("github-release", 2),
     "osv-scanner": ("github-release", 2),
     "actionlint": ("github-release", 2),
     "shellcheck": ("github-release", 2),

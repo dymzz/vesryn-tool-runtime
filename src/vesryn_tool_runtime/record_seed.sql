@@ -451,7 +451,12 @@ VALUES
    NULL,
    'https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-aarch64-pc-windows-msvc.zip',
    'sha256',
-   'e4abca10c3a64ebea742667dd7009449d49403db5460dd6873e389fa2945360f');
+   'e4abca10c3a64ebea742667dd7009449d49403db5460dd6873e389fa2945360f'),
+  ('ripgrep', '15.2.0', 'windows', 'x86_64', 'msvc',
+   NULL,
+   'https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip',
+   'sha256',
+   '71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5');
 
 INSERT INTO tool_asset (tool_id, name, provider, package, entrypoint) VALUES
   ('hyperfine', 'hyperfine', 'github-release', NULL, 'hyperfine');

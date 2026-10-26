@@ -140,9 +140,16 @@ now a directed test.
 | 9 | The default list shipped at `vesryn_tool_runtime/default-tools.json`; the issue contracts `vesryn_tool_runtime/data/default-tools.json` and the `data-include` glob pointed at a directory that did not exist | the resource moved to `data/default-tools.json`; the wheel ships `vesryn_tool_runtime/data/default-tools.json` |
 | 10 | Dead and duplicated code: an unreachable second probe branch, an unused `_owned_by` helper, an unused parameter, and a `PREPARE_STATUSES` constant that did not match the statuses actually returned | removed; the constant now lists the returned statuses |
 | 11 | A `.bat`/`.cmd` entry in a path with spaces was probed with an unquoted `cmd /c` line | the command line is quoted for `cmd.exe` |
+| 12 | The runtime could not replace its OWN previous copy, so a tool could never be upgraded — every re-preparation ended in `entry_conflict` | our own recorded copy is replaced (an upgrade); a file of unknown ownership is still refused |
+| 13 | The legacy release lookup ignored the ABI, so a same-version release of another ABI could be picked | the ABI is part of the lookup |
+| 14 | `reused` carried two meanings: "an existing command of unknown ownership was taken as-is" and "the verified payload was already in the asset store" | the native path reports `reused` when the payload was reused; both meanings are documented |
+| 15 | `user_data_root()` ignored the caller's environment, so `VESRYN_TOOLS_HOME` came from the host process | the root follows the target environment |
+| 16 | An empty target PATH fell back to the host's PATH | an empty PATH resolves nothing |
+| 17 | `tools.json` was written through a fixed temp name, so concurrent writers collided | a unique temp name in the same directory |
+| 18 | The declaration had no windows x86_64 ripgrep release although this record claimed one — `prepare_tool("ripgrep")` raised `missing_release` on this host | the official `ripgrep-15.2.0-x86_64-pc-windows-msvc.zip` release was added with the publisher digest (`71b2fef8…`) taken from the GitHub release metadata; the committed demo library was regenerated from schema+seed |
 
-Verification after the fixes: `tests/test_host_tools.py` 19 passed; full suite
-188 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
+Verification after the fixes: `tests/test_host_tools.py` 25 passed; full suite
+193 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
 on this Windows host); `ruff check` and `ruff format --check` clean; the built
 wheel ships `vesryn_tool_runtime/data/default-tools.json` and
 `default_tools()` resolves it from the installed layout.
