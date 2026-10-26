@@ -33,7 +33,12 @@ Agent list:
   `tool_id`; an external reuse without upstream evidence is recorded
   honestly with `source_verified=0` — never a fabricated download, and the
   executable's own file hash is never passed off as a verified publisher
-  digest.
+  digest. The verification state belongs to ONE artifact: the recorded
+  (tool, version, entry) AND the declared release's publisher digest. A
+  re-preparation keeps the owner of that entry (a fact about the entry) and
+  keeps the verification only while the declared artifact is still the one
+  the asset store holds — that store is keyed by the publisher digest, so
+  the path IS the artifact's identity.
 - **Two stores, one operation**: SQLite (facts) commits first, then
   `tools.json` is regenerated from the committed facts — stable-sorted,
   deduplicated, written via a same-directory temp file and `os.replace`
@@ -167,9 +172,10 @@ now a directed test.
 | 32 | The declaration's deptry Windows release carried `abi: gnu` — copied from the manylinux row — so the host (windows → msvc) could not select it at all; it was the only Windows row in the whole declaration with a glibc ABI | the row states `abi: msvc`, like the other Windows wheels (py-spy, tach); the publisher digest was re-verified against the publisher's own bytes before the correction, and the committed demo library was rebuilt from schema+seed |
 | 33 | The tool environment's interpreter was left to the backend: uv picks one on its own, and on a free-threaded host that pick cannot load the stable-ABI (abi3) wheels publishers ship — the install failed with "the wheel was built for the stable ABI, which requires a GIL-enabled interpreter" | the interpreter is NAMED: the running one when it can load the artifact, otherwise a GIL-enabled interpreter of the same version from the target PATH; a host with neither reports `interpreter_unavailable` instead of a backend dump |
 | 34 | The recorded owner and verification state were inherited by (tool, entry) alone: after a version switch, the new version's registration inherited the OLD version's `source_verified=true` and its installation owner — a version the runtime never downloaded nor verified | the facts belong to ONE artifact: the recorded (tool, version, entry). A different version at the same path is another artifact, so it is recorded as an honest external reuse (`prepared_via=external`, `source_verified=0`) |
+| 35 | Matching the VERSION was still not matching the ARTIFACT: a declaration that now offers another artifact for that version (a corrected digest, another platform/ABI release under the same version) kept the earlier registration's `source_verified=true` — a claim about bytes the runtime never verified | the verification state is checked against the artifact's identity: the DECLARED release's publisher digest must be the one the asset store holds (the store is keyed by that digest, so the path IS the identity). The owner is a fact about the ENTRY and is kept; the verification fact about a different artifact does not carry |
 
-Verification after the fixes: `tests/test_host_tools.py` 39 passed; full suite
-208 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
+Verification after the fixes: `tests/test_host_tools.py` 40 passed; full suite
+209 passed, 1 skipped (the pre-existing #8 concurrency case still flakes only
 on this Windows host); `ruff check` and `ruff format --check` clean; the built
 wheel ships `vesryn_tool_runtime/data/default-tools.json` and
 `default_tools()` resolves it from the installed layout.
