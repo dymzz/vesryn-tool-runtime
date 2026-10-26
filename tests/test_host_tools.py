@@ -47,35 +47,55 @@ def env(tmp_path):
     }
 
 
-def _declared_artifact(env):
-    """The vulture asset, its 2.16 release and where the artifact is stored."""
+def _synthetic_declaration(env, *, version="2.16", payload=b"the verified wheel"):
+    """A declaration whose artifact identity this test controls.
+
+    Returns (asset, release, stored): the asset the runtime sees, the release
+    it declares, and where the verified artifact lives in the asset store.
+    The digest is the digest OF THE PAYLOAD, so the artifact's bytes can
+    actually be checked against it.
+    """
+    import hashlib
     from urllib.parse import urlsplit
 
-    from vesryn_tool_runtime.discovery_records import ToolAsset
-    from vesryn_tool_runtime.record_sources import bundled_records
+    from vesryn_tool_runtime.discovery_records import ToolAsset, ToolAssetVersion
 
-    asset = next(
-        r
-        for r in bundled_records()
-        if isinstance(r, ToolAsset) and r.tool_id == "vulture"
+    digest = hashlib.sha256(payload).hexdigest()
+    source = (
+        "https://files.pythonhosted.org/packages/aa/bb/vulture-2.16-py3-none-any.whl"
     )
-    release = next(item for item in asset.versions if item.version == "2.16")
-    name = PurePosixPath(urlsplit(release.source).path).name
+    release = ToolAssetVersion(
+        version=version,
+        source=source,
+        digest_type="sha256",
+        digest=digest,
+        platform=None,
+        python=">=3.9",
+    )
+    asset = ToolAsset(
+        tool_id="vulture",
+        name="vulture",
+        provider="uv",
+        versions=(release,),
+        entrypoint="vulture",
+        package="vulture",
+    )
+    name = PurePosixPath(urlsplit(source).path).name
     stored = (
         Path(env["environ"]["VESRYN_TOOL_ASSETS"])
         / "python"
         / "asset-vulture"
-        / "version-2.16"
-        / release.digest
+        / ("version-" + version)
+        / digest
         / name
     )
     return asset, release, stored
 
 
-def _store_artifact(stored):
+def _store_artifact(stored, payload=b"the verified wheel"):
     """Put the verified artifact where the runtime puts it."""
     stored.parent.mkdir(parents=True, exist_ok=True)
-    stored.write_bytes(b"the verified wheel")
+    stored.write_bytes(payload)
     return stored
 
 
@@ -532,7 +552,10 @@ def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
     from vesryn_tool_runtime import host_tools
 
     calls = []
-    _asset, _release, stored = _declared_artifact(env)
+    asset, _release, stored = _synthetic_declaration(env)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
     monkeypatch.setattr(
         host_tools,
         "_verified_artifact",
@@ -568,20 +591,88 @@ def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
     assert again["source_verified"] is True
 
 
-def test_the_verification_state_requires_the_declared_artifact_identity(
-    env, monkeypatch
-):
-    """The verification fact is about an artifact identity, not a version.
+@pytest.mark.parametrize("changed", ["digest", "source"])
+def test_cached_replacement_is_not_installation_proof(env, monkeypatch, changed):
+    """A cached B must never claim that the current entry was installed from B."""
+    asset_a, _release_a, cached_a = _synthetic_declaration(env)
+    _store_artifact(cached_a)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset_a,)
+    )
+    installs = []
 
-    The declared release's publisher digest must be the one the asset store
-    holds: a declaration that now offers another artifact for that version
-    describes bytes the runtime never verified, so the fact does not carry.
+    def backend(argv, **kwargs):
+        if isinstance(argv, list) and "tool" in argv:
+            installs.append(argv)
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    installed = prepare_tool(
+        "vulture", root=env["root"], environ=env["environ"], runner=backend
+    )
+    assert installed["source_verified"] is True
+    # The replacement is downloaded/cached, but has NEVER been installed.
+    if changed == "source":
+        from dataclasses import replace
+
+        asset_b = replace(
+            asset_a,
+            versions=(replace(_release_a, source="https://example.test/other.whl"),),
+        )
+    else:
+        asset_b, _release_b, cached_b = _synthetic_declaration(
+            env, payload=b"another artifact of the same version"
+        )
+        _store_artifact(cached_b, b"another artifact of the same version")
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset_b,)
+    )
+    again = prepare_tool(
+        "vulture", root=env["root"], environ=env["environ"], runner=backend
+    )
+    assert len(installs) == 1
+    assert again["prepared_via"] == "uv"
+    assert again["source_verified"] is False
+    # Repeating the lookup must not turn availability into installation evidence.
+    repeated = prepare_tool(
+        "vulture", root=env["root"], environ=env["environ"], runner=backend
+    )
+    assert repeated["source_verified"] is False
+    # Declaration sync must retain A's installation evidence rather than save B's.
+    from vesryn_tool_runtime import open_record_store
+
+    store = open_record_store(tools_database(env["root"]))
+    assert store._db.execute(
+        "SELECT verified_source, verified_sha256 FROM tool_install"
+    ).fetchone() == (_release_a.source, _release_a.digest)
+    store.close()
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset_a,)
+    )
+    original = prepare_tool(
+        "vulture", root=env["root"], environ=env["environ"], runner=backend
+    )
+    assert original["source_verified"] is True
+    assert len(installs) == 1
+
+
+def test_the_ownership_lookup_compares_the_entry_as_a_path(env, monkeypatch):
+    """The recorded entry is compared as a PATH, not as a byte string.
+
+    The shared list compares a resolved entry with the recorded one through
+    the path identity rule (`normcase(abspath(...))`). The ownership lookup
+    must use the same rule: an entry recorded in another equivalent form is
+    still the same entry, and the owner must be found.
     """
-    from types import SimpleNamespace
+    import os
 
     from vesryn_tool_runtime import host_tools
 
-    asset, release, stored = _declared_artifact(env)
+    asset, _release, stored = _synthetic_declaration(env)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
     monkeypatch.setattr(
         host_tools,
         "_verified_artifact",
@@ -603,27 +694,99 @@ def test_the_verification_state_requires_the_declared_artifact_identity(
     assert outcome["status"] == "installed"
     entry = outcome["entry"]
 
-    # The declared artifact is the verified one: the fact holds.
-    owner, verified = host_tools._existing_ownership(
-        asset, "2.16", entry, env["root"], env["environ"]
+    # The same file, written in another equivalent form.
+    variant = os.path.join(os.path.dirname(entry), ".", os.path.basename(entry))
+    assert variant != entry
+    owner, _source, _sha256 = host_tools._existing_ownership(
+        asset, "2.16", variant, env["root"]
     )
-    assert (owner, verified) == ("uv", True)
-
-    # The declaration now offers ANOTHER artifact for that version.
-    changed = SimpleNamespace(
-        tool_id=asset.tool_id,
-        provider=asset.provider,
-        versions=(
-            SimpleNamespace(version="2.16", digest="f" * 64, source=release.source),
-        ),
-    )
-    owner, verified = host_tools._existing_ownership(
-        changed, "2.16", entry, env["root"], env["environ"]
-    )
-    # The owner is a fact about the entry and stays; the verification fact
-    # is about the artifact and does not carry.
     assert owner == "uv"
-    assert verified is False
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="case-insensitive paths")
+def test_the_ownership_lookup_finds_an_entry_recorded_in_another_case(env, monkeypatch):
+    """On Windows the same file can be recorded with another case."""
+    from vesryn_tool_runtime import host_tools
+
+    asset, _release, stored = _synthetic_declaration(env)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
+    monkeypatch.setattr(
+        host_tools,
+        "_verified_artifact",
+        lambda asset, release, **kwargs: _store_artifact(stored),
+    )
+
+    def installing_uv(argv, **kwargs):
+        if "tool" in argv:
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    outcome = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert outcome["status"] == "installed"
+    owner, _source, _sha256 = host_tools._existing_ownership(
+        asset,
+        "2.16",
+        outcome["entry"].upper(),
+        env["root"],
+    )
+    assert owner == "uv"
+
+
+def test_the_declared_release_is_the_one_of_the_target(env):
+    """A version with several releases selects the TARGET's release.
+
+    deptry ships a manylinux and a win_amd64 wheel under the same version;
+    the artifact identity belongs to the release of this target, not to the
+    first one with that version.
+    """
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "deptry"
+    )
+    linux = host_tools._declared_release(asset, "0.25.1", platform="linux")
+    windows = host_tools._declared_release(asset, "0.25.1", platform="windows")
+    assert linux is not None and windows is not None
+    assert linux.digest != windows.digest
+    assert (linux.platform.os, windows.platform.os) == ("linux", "windows")
+
+
+def test_installation_verification_survives_cache_eviction(env, monkeypatch):
+    """Removing a download cache does not erase a verified installation fact."""
+    asset, _release, cached = _synthetic_declaration(env)
+    _store_artifact(cached)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
+
+    def backend(argv, **kwargs):
+        if isinstance(argv, list) and "tool" in argv:
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    installed = prepare_tool(
+        "vulture", root=env["root"], environ=env["environ"], runner=backend
+    )
+    assert installed["source_verified"] is True
+    cached.unlink()
+    again = prepare_tool(
+        "vulture", root=env["root"], environ=env["environ"], runner=backend
+    )
+    assert again["prepared_via"] == "uv"
+    assert again["source_verified"] is True
 
 
 def test_a_switched_version_does_not_inherit_the_verification_state(env, monkeypatch):
@@ -882,7 +1045,6 @@ def test_tools_json_shape_is_strict_and_unlisted_when_not_resolvable(env):
         "命令行基准测试计时",
         "aria2",
         reused=False,
-        source_verified=True,
         status="installed",
     )
     prepare_tool(
@@ -988,7 +1150,6 @@ def test_uninstall_removes_the_exposed_copy(env, monkeypatch):
         "命令行基准测试计时",
         "aria2",
         reused=False,
-        source_verified=True,
         status="installed",
     )
     uninstall_tool("hyperfine", root=env["root"])
@@ -1070,7 +1231,6 @@ def test_list_skips_a_same_name_entry_that_is_not_the_registered_one(env):
         "检测 Python 无用代码",
         "external",
         reused=True,
-        source_verified=False,
         status="reused",
     )
     refresh_tools(root=env["root"], environ=env["environ"])
@@ -1147,7 +1307,6 @@ def test_an_upgrade_replaces_our_own_exposed_copy(env):
         "命令行基准测试计时",
         "aria2",
         reused=False,
-        source_verified=True,
         status="installed",
     )
     entry = host_tools._expose_native_entry(
@@ -1186,7 +1345,6 @@ def test_a_foreign_exposed_command_is_never_overwritten(env):
         "检测 Python 无用代码",
         "aria2",
         reused=False,
-        source_verified=True,
         status="installed",
     )
     with pytest.raises(HostToolError, match="entry_conflict"):
@@ -1207,3 +1365,36 @@ def test_the_list_write_leaves_no_temporary_file(env):
     assert host_tools._atomic_write_json(path, [{"command": "vulture"}]) is True
     assert read_json(path) == [{"command": "vulture"}]
     assert sorted(p.name for p in env["root"].iterdir()) == ["tools.json"]
+
+
+def test_native_backend_must_match_the_selected_artifact(env, monkeypatch):
+    from dataclasses import replace
+
+    from vesryn_tool_runtime import host_tools
+    from vesryn_tool_runtime.discovery_records import ToolAsset
+    from vesryn_tool_runtime.record_sources import bundled_records
+
+    asset = next(
+        r
+        for r in bundled_records()
+        if isinstance(r, ToolAsset) and r.tool_id == "hyperfine"
+    )
+    selected = host_tools._declared_release(asset, "2.0.0", platform="windows")
+    changed = replace(selected, digest="a" * 64)
+    asset = replace(asset, versions=(changed,))
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
+    # The existing backend's same-version artifact must not stand in for the
+    # selected one. No download, exposure or registration is allowed here.
+    with pytest.raises(HostToolError, match="no_preparation_release"):
+        prepare_tool(
+            "hyperfine",
+            root=env["root"],
+            environ=env["environ"],
+            runner=run_fake_uv,
+            platform="windows",
+            aria2=(str(env["bin"] / "aria2c.exe"), "1.37.0", "b" * 64),
+        )
+    assert not tools_database(env["root"]).exists()
+    assert not (env["bin"] / "exposed").exists()

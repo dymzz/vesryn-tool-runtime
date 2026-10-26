@@ -19,7 +19,7 @@ matches it — a same-columns/no-constraints database is refused as drift.
 import sqlite3
 from importlib.resources import files as resource_files
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA_RESOURCE = "record_schema.sql"
 SEED_RESOURCE = "record_seed.sql"
@@ -56,7 +56,8 @@ TABLE_COLUMNS = {
         "description",
         "prepared_via",
         "reused",
-        "source_verified",
+        "verified_source",
+        "verified_sha256",
         "registered_at",
     ),
 }
@@ -80,11 +81,11 @@ def _normalized(sql):
     return " ".join(sql.split())
 
 
-def expected_schema():
+def expected_schema(resource=SCHEMA_RESOURCE):
     """name → normalized DDL for every table and index the frozen file makes."""
     db = sqlite3.connect(":memory:")
     try:
-        db.executescript(schema_sql())
+        db.executescript(_resource(resource))
         rows = db.execute(
             "SELECT name, sql FROM sqlite_master"
             " WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"
@@ -94,9 +95,9 @@ def expected_schema():
         db.close()
 
 
-def schema_matches(db):
+def schema_matches(db, *, resource=SCHEMA_RESOURCE):
     """True when the database's own DDL equals the frozen schema's DDL."""
-    expected = expected_schema()
+    expected = expected_schema(resource)
     rows = db.execute(
         "SELECT name, sql FROM sqlite_master"
         " WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'"

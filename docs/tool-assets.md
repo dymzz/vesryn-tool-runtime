@@ -56,20 +56,21 @@ The host tools module (`host_tools.py`) manages local tool preparation, registra
 Exported from `vesryn_tool_runtime`:
 
 ```python
-default_tools() -> list[dict]
-prepare_tool(tool_id: str, *, command=None, version=None, root=None,
-             environ=None, allow_network=True, backend=None,
-             platform=None, runner=None) -> dict
-refresh_tools(*, root=None, environ=None) -> list[dict]
-uninstall_tool(tool_id: str, *, root=None, environ=None, runner=None) -> dict
-user_data_root() -> Path
+default_tools() -> tuple[dict, ...]
+prepare_tool(tool_id, *, version=None, command=None, description=None,
+             root=None, allow_network=False, platform=None, uv="uv",
+             aria2=None, environ=None, runner=subprocess.run) -> dict
+refresh_tools(root=None, environ=None) -> int
+uninstall_tool(tool_id, *, root=None, uv="uv", environ=None,
+               runner=subprocess.run) -> dict
+user_data_root(environ=None, platform=None) -> Path
 ```
 
 ### The two local stores
 
 The user data root (`user_data_root()`) resolves to `%LOCALAPPDATA%\vesryn\data` on Windows and `$XDG_DATA_HOME|~/.local/share/vesryn/data` on other platforms. It holds two persistent stores:
 
-1. `tools.sqlite3`: The authoritative registration facts table: which tool, version, entry, installation owner (`runtime` vs `external`), and whether the source artifact was verified (`source_verified`).
+1. `tools.sqlite3`: Registration and installation facts: tool, version, entry, preparation backend (`uv`, `aria2`, or `external`), and the actual verified source URL and SHA256 (`verified_source`, `verified_sha256`).
 2. `tools.json`: The Agent-facing tool list: strictly `command` and short `description`, sorted and deduplicated. This file is mounted by Agent hooks (e.g. at SessionStart); it is a snapshot of available commands, not the registry itself.
 
 Verified artifacts (such as fetched Python wheels) live in the asset root (`%LOCALAPPDATA%\vesryn\tool-assets\python\...`), never in the user data root.
@@ -78,9 +79,28 @@ Verified artifacts (such as fetched Python wheels) live in the asset root (`%LOC
 
 - **Explicit Invocation**: Tool preparation and registration require an explicit call to `prepare_tool()`. The runtime never performs background installation during resolution or queries.
 - **Non-Atomic Store Commits**: SQLite commit and `tools.json` publication are coordinated under a cross-process `FileLock`, but are not cross-file atomic. If writing `tools.json` fails after the SQLite commit succeeds, `prepare_tool()` reports status `registered_not_synced`. The registration is safe, and the snapshot can be repaired at any time by calling `refresh_tools()`.
-- **External Tool Reuse**: If an existing executable matching the requested tool and version is discovered on `PATH`, it is registered as `prepared_via: "external"`. Reusing an existing executable does not assert that its source artifact matches the publisher SHA-256 (`source_verified: false`).
+- **Existing Tool Reuse**: A successful entry/version probe permits reuse and registration. The same recorded version and resolved entry retain their installation owner and source proof. An installation without a matching record is `prepared_via: "external"`; lacking source evidence does not make a working CLI unavailable.
 - **Verified Python Installation**: For runtime-managed installations, the selected artifact is verified against the publisher digest before installation (`uv tool install <verified artifact>`). An unverifiable wheel is never installed.
-- **Safe Uninstallation**: `uninstall_tool()` only cleans up installations owned by the runtime (`prepared_via: "runtime"`). If the backend uninstall fails, the registration in `tools.sqlite3` is retained and `uninstall_failed` is reported. Registration is dropped only after successful removal.
+- **Safe Uninstallation**: `uv` ownership permits removal through uv; `aria2` ownership permits removal of the runtime exposure copy while cached artifacts remain. External installations are only unregistered. A failed backend uninstall retains the registration and reports `uninstall_failed`.
+
+### Installation verification
+
+The proof fields record the source URL and SHA256 actually verified and used
+for the installation; they are both present or both NULL. The `prepare_tool`
+result's `source_verified` compares that proof with the selected release's
+version, source and digest for the target. It is computed, not a stored boolean,
+and does not depend on the installation owner.
+
+Caching another artifact does not prove it installed the current entry.
+Removing a download cache does not erase an installation receipt. A changed
+declaration can make the current comparison false while the receipt retains
+the actual installed source. This records installation provenance, not a
+revalidation of executable files separately modified outside the runtime.
+`tools.json` remains a list of callable commands, not source-verification or
+execution-permission decisions.
+
+See [the Schema upgrade boundary](discovery-contracts.md#migration-boundary-explicit)
+for existing registration stores.
 
 ## Public signatures
 

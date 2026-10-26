@@ -10,7 +10,7 @@ operation that updates both local stores:
 
 - ``<user data root>/vesryn/data/tools.sqlite3`` — registrations as ToolAsset
   rows plus host facts in ``tool_install`` (command, version, entry,
-  description, prepared_via, reused, source_verified);
+  description, prepared_via, reused, verified_source, verified_sha256);
 - ``<user data root>/vesryn/data/tools.json`` — the strict command/description
   list Agents read, regenerated from the registration facts.
 
@@ -18,8 +18,9 @@ Reading the packaged default list, importing this module and SessionStart do
 nothing implicit: no registration, download or installation. Nothing here
 modifies host PATH or user config; native PATH exposure stays a host-side
 startup concern. External installs missing upstream verification evidence
-are reused honestly with ``source_verified=0`` — the executable's own file
-hash is never reported as a verified publisher digest.
+are registered after the entry/version probe with ``source_verified=False``.
+This states only that the installation source has not been established; the
+CLI is still available. An executable hash is not a publisher archive hash.
 """
 
 import json
@@ -40,7 +41,7 @@ from .assets import AssetError, AssetPolicy, AssetTarget
 from .discovery_records import RecordError, ToolAsset
 from .native_assets import Aria2NativeBackend, Aria2Source
 from .record_sources import legacy_preparation_definitions
-from .record_store import open_record_store
+from .record_store import open_record_store, upgrade_record_store
 from .uv_assets import host_platform
 
 DEFAULT_TOOLS_RESOURCE = "data/default-tools.json"
@@ -324,6 +325,7 @@ def prepare_tool(
     if asset is None:
         raise HostToolError("unknown_tool", tool_id)
     declared_versions = {item.version for item in asset.versions}
+    _upgrade_host_database(root)
 
     # Probe the target shell FIRST: an already-resolvable entry is reused
     # as-is, but only when the probe SUCCEEDED and the entry reports the
@@ -359,11 +361,11 @@ def prepare_tool(
                 entry,
                 detail=f"existing entry reports: {(shown or '')[:120]}",
             )
-        # Ownership and verification stay as they were recorded: a tool the
-        # runtime installed keeps its installation owner, and a re-probe
-        # never rewrites the verification fact of that same artifact.
-        prepared_via, source_verified = _existing_ownership(
-            asset, matched, entry, root, environ
+        # Keep the recorded installation owner and its actual artifact proof.
+        # The current declaration is compared with that proof below; a cache
+        # hit or successful version probe never creates source evidence.
+        prepared_via, verified_source, verified_sha256 = _existing_ownership(
+            asset, matched, entry, root
         )
         return _register(
             root,
@@ -374,9 +376,11 @@ def prepare_tool(
             description,
             prepared_via,
             reused=True,
-            source_verified=source_verified,
             status="reused",
             environ=environ,
+            verified_source=verified_source,
+            verified_sha256=verified_sha256,
+            platform=platform,
         )
 
     release = _find_release(asset, version, platform)
@@ -438,9 +442,11 @@ def prepare_tool(
             description,
             "uv",
             reused=False,
-            source_verified=True,
             status="installed",
             environ=environ,
+            verified_source=release.source,
+            verified_sha256=release.digest,
+            platform=platform,
         )
 
     if aria2 is None:
@@ -475,6 +481,8 @@ def prepare_tool(
             item
             for item in definition.releases
             if item.version == release.version
+            and item.source == release.source
+            and item.sha256 == release.digest
             and item.os in {"any", release.platform.os}
             and item.arch in {"any", release.platform.arch}
             and (
@@ -534,9 +542,11 @@ def prepare_tool(
         # from the external reuse above, where an existing command of
         # unknown ownership was taken as-is.
         reused=receipt.outcome.reused,
-        source_verified=True,
         status="reused" if receipt.outcome.reused else "installed",
         environ=environ,
+        verified_source=legacy_release.source,
+        verified_sha256=legacy_release.sha256,
+        platform=platform,
     )
 
 
@@ -784,76 +794,48 @@ def _uv_package(tool_id, fallback):
     return fallback
 
 
-def _declared_release(asset, version):
-    """The declared release of that version, or None."""
-    for release in asset.versions:
-        if release.version == version:
-            return release
-    return None
+def _declared_release(asset, version, platform=None):
+    """The declared release of that version FOR THIS TARGET, or None.
 
-
-def _verified_artifact_present(asset, version, environ=None):
-    """Whether the asset store holds the DECLARED artifact of that version.
-
-    The asset store is keyed by the publisher digest, so the path IS the
-    artifact's identity: the declared artifact and the verified one are the
-    same bytes, or the verification fact does not hold for it. The bytes
-    themselves are checked when an artifact is fetched and again when a
-    cached copy is reused; this asks whether THAT artifact is the one the
-    declaration names.
+    A version can carry more than one release — deptry ships a manylinux and
+    a win_amd64 wheel under the same version — so the release is selected the
+    way the preparation selects it: by the target's platform and ABI.
     """
-    from urllib.parse import urlsplit
-
-    release = _declared_release(asset, version)
-    if release is None:
-        return False
-    environ = os.environ if environ is None else environ
-    root = asset_root(environ=_run_env(environ))
-    if asset.provider == "uv":
-        name = PurePosixPath(urlsplit(release.source).path).name
-        path = (
-            python_asset_directory(root, asset.tool_id, release.version, release.digest)
-            / name
-        )
-    else:
-        path = root / "downloads" / ("sha256-" + release.digest) / "artifact"
-    return path.is_file()
+    try:
+        return _find_release(asset, version, platform)
+    except HostToolError:
+        return None
 
 
-def _existing_ownership(asset, version, entry, root, environ=None):
-    """The recorded owner and verification state of an already-registered entry.
+def _existing_ownership(asset, version, entry, root):
+    """Recorded installation owner and proof for the same version and entry.
 
-    A tool this runtime installed keeps that installation owner when it is
-    prepared again, so the uninstall path still knows what it manages. The
-    owner is a fact about the ENTRY.
-
-    The verification state is a fact about the SOURCE ARTIFACT, and it is
-    checked against that artifact's identity, not only its version: the
-    recorded (tool, version, entry) must be the same entry, and the
-    DECLARED release's publisher digest must be the one the asset store
-    holds. A declaration that now offers another artifact for that version
-    describes bytes the runtime never verified — the fact does not carry,
-    and the registration keeps the owner it has while dropping the
-    verification it cannot back.
+    Download caches and mutable Catalog rows cannot establish what installed
+    this entry. Preserve the actual installation proof even if a new
+    declaration names different bytes; registration derives its current
+    verification result by comparing that proof with the selected release.
     """
     database = tools_database(root)
     if not database.exists():
-        return "external", False
+        return "external", None, None
     store = open_record_store(database)
     try:
         row = store._db.execute(
-            "SELECT prepared_via, source_verified FROM tool_install"
-            " WHERE tool_id = ? AND version = ? AND entry = ?",
-            (asset.tool_id, str(version), str(entry)),
+            "SELECT prepared_via, version, entry, verified_source, verified_sha256"
+            " FROM tool_install WHERE tool_id = ?",
+            (asset.tool_id,),
         ).fetchone()
     finally:
         store.close()
-    if row is None:
-        return "external", False
-    owner, verified = row[0], bool(row[1])
-    if verified and not _verified_artifact_present(asset, version, environ):
-        verified = False
-    return owner, verified
+    if row is not None:
+        owner, recorded_version, recorded_entry, source, sha256 = row
+        if (
+            _version_matches({recorded_version}, str(version))
+            and recorded_entry
+            and _same_entry(entry, recorded_entry)
+        ):
+            return owner, source, sha256
+    return "external", None, None
 
 
 def _store_lock(root, timeout=120):
@@ -867,6 +849,17 @@ def _store_lock(root, timeout=120):
     return FileLock(str(tools_database(root)) + ".lock", timeout=timeout)
 
 
+def _upgrade_host_database(root):
+    """Upgrade only during explicit host preparation/refresh/uninstall."""
+    database = tools_database(root)
+    if database.exists():
+        try:
+            with _store_lock(root):
+                upgrade_record_store(database)
+        except Timeout:
+            raise HostToolError("store_busy", str(root)) from None
+
+
 def _register(
     root,
     asset,
@@ -876,10 +869,18 @@ def _register(
     description,
     prepared_via,
     reused,
-    source_verified,
     status,
     environ=None,
+    verified_source=None,
+    verified_sha256=None,
+    platform=None,
 ):
+    release = _declared_release(asset, version, platform)
+    source_verified = bool(
+        release is not None
+        and verified_source == release.source
+        and verified_sha256 == release.digest
+    )
     root = Path(root)
     database = tools_database(root)
     # The registration and the snapshot it produces are published under the
@@ -887,6 +888,8 @@ def _register(
     # instead of writing a stale list over a newer one.
     try:
         with _store_lock(root):
+            if database.exists():
+                upgrade_record_store(database)
             synced = _register_locked(
                 root,
                 database,
@@ -897,7 +900,8 @@ def _register(
                 description,
                 prepared_via,
                 reused,
-                source_verified,
+                verified_source,
+                verified_sha256,
                 environ,
             )
     except Timeout:
@@ -929,7 +933,8 @@ def _register_locked(
     description,
     prepared_via,
     reused,
-    source_verified,
+    verified_source,
+    verified_sha256,
     environ,
 ):
     """The registration and its snapshot, published under the store's lock."""
@@ -956,8 +961,8 @@ def _register_locked(
         store._db.execute(
             "INSERT OR REPLACE INTO tool_install"
             " (tool_id, command, version, entry, description, prepared_via,"
-            " reused, source_verified, registered_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " reused, verified_source, verified_sha256, registered_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 asset.tool_id,
                 command,
@@ -966,7 +971,8 @@ def _register_locked(
                 description,
                 prepared_via,
                 1 if reused else 0,
-                1 if source_verified else 0,
+                verified_source,
+                verified_sha256,
                 _now(),
             ),
         )
@@ -1066,6 +1072,7 @@ def refresh_tools(root=None, environ=None):
         raise HostToolError("not_registered", "no local registration database")
     try:
         with _store_lock(root):
+            upgrade_record_store(database)
             return _publish_list(root, environ)
     except Timeout:
         raise HostToolError("store_busy", str(root)) from None
@@ -1090,6 +1097,7 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", environ=None, runner=subproce
     database = tools_database(root)
     if not database.exists():
         raise HostToolError("not_registered", tool_id)
+    _upgrade_host_database(root)
     store = open_record_store(database)
     try:
         row = store._db.execute(

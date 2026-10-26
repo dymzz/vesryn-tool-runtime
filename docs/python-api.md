@@ -8,7 +8,7 @@ Import all public symbols directly from `vesryn_tool_runtime`.
 
 ## 1. Public API Groups
 
-All 60 exported symbols in `__all__` belong to seven cohesive functional groups:
+The exported symbols in `__all__` belong to seven functional groups:
 
 ### 1.1 Tool Contracts & Invocation
 - **Core Types**: `ToolSpec`, `ToolResult`, `Invocation`, `ExecutionContext`, `ToolAdapter`, `DispatchReceipt`.
@@ -31,7 +31,7 @@ Selection bindings freeze the exact contract hash, tool version, provider identi
 
 ### 1.4 Discovery Records & Store
 - **Record Types**: `ToolAsset`, `ToolGroup`, `ToolAccess`, `GroupMember`, `Platform`, `ToolAssetVersion`.
-- **Store & Seed**: `open_record_store()`, `bundled_records()`.
+- **Store & Seed**: `open_record_store()`, `upgrade_record_store()`, `bundled_records()`. Opening does not migrate an existing store; the explicit upgrade and its evidence rules are documented in [Discovery contracts](discovery-contracts.md#migration-boundary-explicit).
 - **Serialization**: `record_document()`, `record_from_document()`.
 - **Query & Pagination**: `DiscoveryQuery`, `DiscoveryPage`, `DiscoveryDiagnostic`, `DiscoveryErrorDocument`.
 - **Exceptions**: `RecordError`, `DiscoveryContractError`.
