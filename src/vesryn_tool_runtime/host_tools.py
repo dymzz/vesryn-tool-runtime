@@ -363,7 +363,7 @@ def prepare_tool(
         # runtime installed keeps its installation owner, and a re-probe
         # never rewrites the verification fact of that same artifact.
         prepared_via, source_verified = _existing_ownership(
-            asset.tool_id, matched, entry, root
+            asset, matched, entry, root, environ
         )
         return _register(
             root,
@@ -784,17 +784,57 @@ def _uv_package(tool_id, fallback):
     return fallback
 
 
-def _existing_ownership(tool_id, version, entry, root):
+def _declared_release(asset, version):
+    """The declared release of that version, or None."""
+    for release in asset.versions:
+        if release.version == version:
+            return release
+    return None
+
+
+def _verified_artifact_present(asset, version, environ=None):
+    """Whether the asset store holds the DECLARED artifact of that version.
+
+    The asset store is keyed by the publisher digest, so the path IS the
+    artifact's identity: the declared artifact and the verified one are the
+    same bytes, or the verification fact does not hold for it. The bytes
+    themselves are checked when an artifact is fetched and again when a
+    cached copy is reused; this asks whether THAT artifact is the one the
+    declaration names.
+    """
+    from urllib.parse import urlsplit
+
+    release = _declared_release(asset, version)
+    if release is None:
+        return False
+    environ = os.environ if environ is None else environ
+    root = asset_root(environ=_run_env(environ))
+    if asset.provider == "uv":
+        name = PurePosixPath(urlsplit(release.source).path).name
+        path = (
+            python_asset_directory(root, asset.tool_id, release.version, release.digest)
+            / name
+        )
+    else:
+        path = root / "downloads" / ("sha256-" + release.digest) / "artifact"
+    return path.is_file()
+
+
+def _existing_ownership(asset, version, entry, root, environ=None):
     """The recorded owner and verification state of an already-registered entry.
 
     A tool this runtime installed keeps that installation owner when it is
     prepared again, so the uninstall path still knows what it manages. The
-    verification fact of that same artifact is not rewritten by a re-probe.
+    owner is a fact about the ENTRY.
 
-    Those facts belong to ONE artifact: the recorded VERSION at that entry.
-    The same path carrying another version is another artifact — the runtime
-    never downloaded nor verified it — so the earlier registration says
-    nothing about it and the entry stays an honest external reuse.
+    The verification state is a fact about the SOURCE ARTIFACT, and it is
+    checked against that artifact's identity, not only its version: the
+    recorded (tool, version, entry) must be the same entry, and the
+    DECLARED release's publisher digest must be the one the asset store
+    holds. A declaration that now offers another artifact for that version
+    describes bytes the runtime never verified — the fact does not carry,
+    and the registration keeps the owner it has while dropping the
+    verification it cannot back.
     """
     database = tools_database(root)
     if not database.exists():
@@ -804,13 +844,16 @@ def _existing_ownership(tool_id, version, entry, root):
         row = store._db.execute(
             "SELECT prepared_via, source_verified FROM tool_install"
             " WHERE tool_id = ? AND version = ? AND entry = ?",
-            (tool_id, str(version), str(entry)),
+            (asset.tool_id, str(version), str(entry)),
         ).fetchone()
     finally:
         store.close()
     if row is None:
         return "external", False
-    return row[0], bool(row[1])
+    owner, verified = row[0], bool(row[1])
+    if verified and not _verified_artifact_present(asset, version, environ):
+        verified = False
+    return owner, verified
 
 
 def _store_lock(root, timeout=120):
