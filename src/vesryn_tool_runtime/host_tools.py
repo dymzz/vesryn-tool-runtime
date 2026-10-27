@@ -1206,6 +1206,7 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", environ=None, runner=subproce
             text=True,
             timeout=120,
             check=False,
+            env=_run_env(environ),
         )
         if result.returncode != 0:
             raise HostToolError(

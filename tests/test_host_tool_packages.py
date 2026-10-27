@@ -8,7 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from vesryn_tool_runtime import HostToolError, ToolAsset, bundled_records, prepare_tool
+from vesryn_tool_runtime import (
+    HostToolError,
+    ToolAsset,
+    bundled_records,
+    prepare_tool,
+    uninstall_tool,
+)
 from vesryn_tool_runtime.discovery_records import ToolAssetVersion
 from vesryn_tool_runtime.host_tools import tools_database, tools_json
 
@@ -252,6 +258,65 @@ def test_same_cli_without_plugins_is_not_a_plugin_environment_hit(uv_case):
     assert with_plugin["status"] == "installed"
     assert _versions(with_plugin)["vtr-plugin"] == "1.0"
     assert len(_installs(uv_case)) == 2
+
+
+def test_real_uv_uninstall_uses_the_prepared_directory_and_preserves_the_host_tool(
+    uv_case, tmp_path, monkeypatch
+):
+    import sqlite3
+
+    uv = shutil.which("uv")
+    host_bin = tmp_path / "host-bin"
+    host_bin.mkdir()
+    host_environ = {
+        **uv_case["environ"],
+        "PATH": str(host_bin),
+        "UV_TOOL_DIR": str(tmp_path / "host-tools"),
+        "UV_TOOL_BIN_DIR": str(host_bin),
+        "UV_CACHE_DIR": str(tmp_path / "host-cache"),
+    }
+    host_root = tmp_path / "host-data"
+    host = prepare_tool(
+        "vtr-cli",
+        version="1.0",
+        command="vtr-cli",
+        description="Host control CLI",
+        root=host_root,
+        uv=uv,
+        environ=host_environ,
+        with_packages=(),
+        runner=uv_case["runner"],
+    )
+    target = uv_case["prepare"](("vtr-plugin==1.0",))
+    assert host["status"] == target["status"] == "installed"
+    host_manifest = tools_json(host_root).read_bytes()
+    with sqlite3.connect(tools_database(host_root)) as db:
+        host_registration = db.execute("SELECT * FROM tool_install").fetchall()
+    # Model a host with the same package, entirely inside this fixture. An
+    # uninstall that inherits the process environment will remove that control.
+    for key, value in host_environ.items():
+        monkeypatch.setenv(key, value)
+
+    result = uninstall_tool(
+        "vtr-cli",
+        root=uv_case["root"],
+        uv=uv,
+        environ=uv_case["environ"],
+        runner=uv_case["runner"],
+    )
+    assert result["status"] == "uninstalled"
+    assert not Path(target["entry"]).exists()
+    assert not Path(target["environment"]["prefix"]).exists()
+    with sqlite3.connect(tools_database(uv_case["root"])) as db:
+        assert db.execute("SELECT * FROM tool_install").fetchall() == []
+    assert json.loads(tools_json(uv_case["root"]).read_text(encoding="utf-8")) == []
+    probe = subprocess.run(
+        [host["entry"], "--version"], capture_output=True, text=True, check=True
+    )
+    assert probe.stdout.strip() == "vtr_cli-1.0"
+    assert tools_json(host_root).read_bytes() == host_manifest
+    with sqlite3.connect(tools_database(host_root)) as db:
+        assert db.execute("SELECT * FROM tool_install").fetchall() == host_registration
 
 
 def test_missing_offline_plugin_keeps_old_registration_honest(uv_case):
