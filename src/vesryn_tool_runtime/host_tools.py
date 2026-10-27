@@ -429,7 +429,9 @@ def prepare_tool(
         artifact = _verified_artifact(
             asset, release, allow_network=allow_network, environ=environ
         )
-        interpreter = _tool_interpreter(artifact.name, environ, packages or ())
+        interpreter = _tool_interpreter(
+            artifact.name, environ, packages or (), uv, runner
+        )
         if interpreter is None:
             # No interpreter on this host can load the artifact's extensions.
             raise HostToolError(
@@ -713,20 +715,47 @@ def _pure_python_artifact(name):
     return all(tag.platform == "any" and tag.abi == "none" for tag in tags)
 
 
-def _path_interpreters(environ):
-    """The target PATH's interpreters, in PATH order."""
-    version = f"{sys.version_info.major}.{sys.version_info.minor}"
-    names = ("python.exe", "python3.exe", f"python{version}.exe", "python3", "python")
-    for entry in (environ.get("PATH") or "").split(os.pathsep):
-        if not entry:
+def _uv_interpreters(uv, environ, version, runner=subprocess.run):
+    """The GIL-enabled interpreters uv knows for that version, in uv's order.
+
+    uv's own listing is the source. It tells the free-threaded builds apart
+    from the ordinary ones — its key and its variant say which a build is —
+    and it lists the interpreters uv manages, which are not on the target
+    PATH at all. Only an installed interpreter (one with a path) can be
+    named; a version uv could download is not one yet.
+    """
+    result = runner(
+        [uv, "python", "list", "--output-format", "json"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        env=_run_env(environ or {}),
+    )
+    if result.returncode != 0:
+        return []
+    try:
+        entries = json.loads(result.stdout or "[]")
+    except ValueError:
+        return []
+    found = []
+    for entry in entries:
+        if not isinstance(entry, dict):
             continue
-        for name in names:
-            candidate = Path(entry) / name
-            if candidate.is_file():
-                yield str(candidate)
+        path = entry.get("path")
+        if not path or entry.get("implementation") != "cpython":
+            continue
+        if entry.get("variant") != "default":
+            # The free-threaded build cannot load a GIL-bound wheel.
+            continue
+        if not str(entry.get("version", "")).startswith(version + "."):
+            continue
+        found.append(path)
+    return found
 
 
-def _tool_interpreter(name, environ, packages=()):
+def _tool_interpreter(name, environ, packages=(), uv="uv", runner=subprocess.run):
     """The interpreter that builds the tool environment — named, not guessed.
 
     uv picks an interpreter on its own when none is named, and on a
@@ -734,8 +763,8 @@ def _tool_interpreter(name, environ, packages=()):
     compiled wheel: the install then fails with "the wheel was built for
     the stable ABI, which requires a GIL-enabled interpreter". The
     interpreter is therefore named — the running one when it can load the
-    artifact, otherwise a GIL-enabled interpreter of the SAME version from
-    the target PATH. None means no interpreter can load it.
+    artifact, otherwise a GIL-enabled interpreter of the SAME version, taken
+    from uv's own list. None means no interpreter can load it.
 
     A requested plugin set is installed into the SAME environment, so the
     interpreter has to load its artifacts too. Published plugin wheels are
@@ -756,10 +785,8 @@ def _tool_interpreter(name, environ, packages=()):
     if not packages and _pure_python_artifact(name):
         # Nothing compiled is going into the environment.
         return running
-    for candidate in _path_interpreters(environ):
-        other = _interpreter_facts(candidate)
-        if other is None or other[:2] != facts[:2] or not other[2]:
-            continue
+    version = f"{facts[0]}.{facts[1]}"
+    for candidate in _uv_interpreters(uv, environ, version, runner):
         return candidate
     if _pure_python_artifact(name):
         # The plugin set may be pure Python after all: keep the running

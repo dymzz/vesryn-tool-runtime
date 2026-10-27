@@ -305,7 +305,11 @@ def test_a_compiled_wheel_names_a_gil_enabled_interpreter(env, monkeypatch):
     monkeypatch.setattr(
         host_tools, "_interpreter_facts", lambda executable: facts.get(str(executable))
     )
-    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [str(other)])
+    monkeypatch.setattr(
+        host_tools,
+        "_uv_interpreters",
+        lambda uv, environ, version, runner: [str(other)],
+    )
 
     # A compiled wheel (a platform-specific one) needs the GIL-enabled build.
     assert host_tools._tool_interpreter(
@@ -337,7 +341,11 @@ def test_a_plugin_set_names_a_gil_enabled_interpreter(env, monkeypatch):
     monkeypatch.setattr(
         host_tools, "_interpreter_facts", lambda executable: facts.get(str(executable))
     )
-    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [str(other)])
+    monkeypatch.setattr(
+        host_tools,
+        "_uv_interpreters",
+        lambda uv, environ, version, runner: [str(other)],
+    )
 
     # A pure-python wheel WITH a plugin set: the plugin's own artifacts have
     # to load in that environment, so the GIL-enabled build is named.
@@ -353,7 +361,9 @@ def test_a_plugin_set_names_a_gil_enabled_interpreter(env, monkeypatch):
     )
     # A host without a GIL-enabled interpreter keeps the running one: the
     # plugin set may be pure Python, and that is not refused over.
-    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [])
+    monkeypatch.setattr(
+        host_tools, "_uv_interpreters", lambda uv, environ, version, runner: []
+    )
     assert (
         host_tools._tool_interpreter(
             "sphinx-9.2.0-py3-none-any.whl",
@@ -371,13 +381,83 @@ def test_no_interpreter_that_can_load_the_wheel_is_a_stable_reason(env, monkeypa
     monkeypatch.setattr(
         host_tools, "_interpreter_facts", lambda executable: (3, 14, False)
     )
-    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [])
+    monkeypatch.setattr(
+        host_tools, "_uv_interpreters", lambda uv, environ, version, runner: []
+    )
     assert (
         host_tools._tool_interpreter(
             "deptry-0.25.1-cp310-abi3-win_amd64.whl", env["environ"]
         )
         is None
     )
+
+
+def test_the_gil_interpreters_come_from_uv_own_listing(env):
+    """uv's list tells the builds apart, and names the ones it manages.
+
+    uv's own listing says which build an entry is — the free-threaded one
+    cannot load a GIL-bound wheel — and it lists the interpreters uv
+    manages, which are not on the target PATH at all. An entry uv could
+    only download is not an interpreter yet.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    listing = json.dumps(
+        [
+            {
+                "key": "cpython-3.14.3-windows-x86_64-none",
+                "version": "3.14.3",
+                "variant": "default",
+                "implementation": "cpython",
+                "path": "C:/python314/python.exe",
+            },
+            {
+                "key": "cpython-3.14.8+freethreaded-windows-x86_64-none",
+                "version": "3.14.8",
+                "variant": "freethreaded",
+                "implementation": "cpython",
+                "path": "C:/python314t/python.exe",
+            },
+            {
+                "key": "cpython-3.14.3-windows-x86_64-none",
+                "version": "3.14.3",
+                "variant": "default",
+                "implementation": "cpython",
+                "path": "C:/uv/python/cpython-3.14.3/python.exe",
+            },
+            {
+                "key": "cpython-3.13.5-windows-x86_64-none",
+                "version": "3.13.5",
+                "variant": "default",
+                "implementation": "cpython",
+                "path": "C:/python313/python.exe",
+            },
+            {
+                "key": "cpython-3.15.0-windows-x86_64-none",
+                "version": "3.15.0",
+                "variant": "default",
+                "implementation": "cpython",
+                "path": None,
+            },
+        ]
+    )
+    calls = []
+
+    def listing_uv(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, listing, "")
+
+    assert host_tools._uv_interpreters("uv", env["environ"], "3.14", listing_uv) == [
+        "C:/python314/python.exe",
+        "C:/uv/python/cpython-3.14.3/python.exe",
+    ]
+    assert calls == [["uv", "python", "list", "--output-format", "json"]]
+
+    # A listing uv cannot read leaves the caller with no candidate.
+    def failing_uv(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 1, "", "no")
+
+    assert host_tools._uv_interpreters("uv", env["environ"], "3.14", failing_uv) == []
 
 
 def test_the_selected_artifact_is_digest_checked_before_the_install(
