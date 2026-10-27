@@ -113,7 +113,11 @@ receipt = prepare_tool(
     version="9.2.0",
     command="sphinx-build",
     description="Build the project's Sphinx documentation",
-    with_packages=("myst-parser==5.1.0", "sphinx-needs==9.1.0", "sphinx-codelinks==2.0.1"),
+    with_packages=(
+        "myst-parser==5.1.0",
+        "sphinx-needs==9.1.0",
+        "sphinx-codelinks==2.0.1",
+    ),
     allow_network=True,
 )
 ```
