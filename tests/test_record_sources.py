@@ -54,6 +54,7 @@ EXPECTED_TOOLS = {
     "tach": ("uv", 2),
     "sphinx": ("uv", 1),
     "ub-test-reports": ("uv", 1),
+    "griffe": ("uv", 1),
 }
 VULTURE_214_URL = (
     "https://files.pythonhosted.org/packages/a0/56/0cc15b8ff2613c1d5c3"
