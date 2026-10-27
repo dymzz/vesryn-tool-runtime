@@ -36,6 +36,11 @@ from pathlib import Path, PurePosixPath
 
 from filelock import FileLock, Timeout
 
+from ._uv_tool_packages import (
+    inspect_uv_tool,
+    normalize_with_packages,
+    satisfies_request,
+)
 from .asset_index import AssetIndex, asset_root, python_asset_directory
 from .assets import AssetError, AssetPolicy, AssetTarget
 from .discovery_records import RecordError, ToolAsset
@@ -294,12 +299,17 @@ def prepare_tool(
     aria2=None,
     environ=None,
     runner=subprocess.run,
+    with_packages=None,
 ):
     """Check, prepare, register and sync one tool — the single entry.
 
     Returns an outcome document; ``registered_not_synced`` means the SQLite
     registration committed but the shared JSON did not (explicit rebuild
     via ``refresh_tools``); nothing partial is reported as success.
+
+    ``with_packages=None`` preserves legacy behavior. An explicit tuple/list
+    selects exact additional uv requirements; ``()`` clears that requested
+    set. Reuse then requires the actual tool environment, not just CLI version.
     """
     environ = os.environ if environ is None else dict(environ)
     root = user_data_root(environ=environ) if root is None else Path(root)
@@ -324,8 +334,15 @@ def prepare_tool(
     )
     if asset is None:
         raise HostToolError("unknown_tool", tool_id)
+    try:
+        packages = normalize_with_packages(with_packages, asset.package or tool_id)
+    except (ValueError, TypeError) as error:
+        raise HostToolError("invalid_input", str(error)) from None
+    if packages is not None and asset.provider != "uv":
+        raise HostToolError("invalid_input", "additional packages require a uv tool")
     declared_versions = {item.version for item in asset.versions}
     _upgrade_host_database(root)
+    proof = (None, None)
 
     # Probe the target shell FIRST: an already-resolvable entry is reused
     # as-is, but only when the probe SUCCEEDED and the entry reports the
@@ -367,21 +384,43 @@ def prepare_tool(
         prepared_via, verified_source, verified_sha256 = _existing_ownership(
             asset, matched, entry, root
         )
-        return _register(
-            root,
-            asset,
-            command,
-            matched,
-            entry,
-            description,
-            prepared_via,
-            reused=True,
-            status="reused",
-            environ=environ,
-            verified_source=verified_source,
-            verified_sha256=verified_sha256,
-            platform=platform,
-        )
+        proof = verified_source, verified_sha256
+        environment = None
+        if packages is not None:
+            observed = _inspect_packages(uv, asset, environ, runner)
+            if observed is None or not any(
+                _same_entry(entry, path) for path in observed["entrypoints"]
+            ):
+                return _outcome(
+                    "conflict",
+                    tool_id,
+                    command,
+                    matched,
+                    entry,
+                    detail="entry is not owned by the selected uv tool environment",
+                )
+            if satisfies_request(observed, asset.package or tool_id, matched, packages):
+                environment = observed["environment"]
+            version = matched
+        if packages is None or environment is not None:
+            outcome = _register(
+                root,
+                asset,
+                command,
+                matched,
+                entry,
+                description,
+                prepared_via,
+                reused=True,
+                status="reused",
+                environ=environ,
+                verified_source=verified_source,
+                verified_sha256=verified_sha256,
+                platform=platform,
+            )
+            if environment is not None:
+                outcome["environment"] = environment
+            return outcome
 
     release = _find_release(asset, version, platform)
     version = release.version
@@ -406,6 +445,10 @@ def prepare_tool(
             runner,
             allow_network=allow_network,
             interpreter=interpreter,
+            with_packages=packages or (),
+            environ=environ,
+            reinstall_main=packages is not None
+            and proof != (release.source, release.digest),
         )
         entry, shown, probed, probe_detail = _probe(command, environ, runner)
         if entry is None:
@@ -433,7 +476,22 @@ def prepare_tool(
                 entry,
                 detail=f"resolved entry reports: {(shown or '')[:120]}",
             )
-        return _register(
+        environment = None
+        if packages is not None:
+            observed = _inspect_packages(uv, asset, environ, runner)
+            if (
+                observed is None
+                or not any(_same_entry(entry, path) for path in observed["entrypoints"])
+                or not satisfies_request(
+                    observed, asset.package or tool_id, version, packages
+                )
+            ):
+                raise HostToolError(
+                    "environment_unverified",
+                    "installed tool does not satisfy the complete request",
+                )
+            environment = observed["environment"]
+        outcome = _register(
             root,
             asset,
             command,
@@ -448,6 +506,9 @@ def prepare_tool(
             verified_sha256=release.digest,
             platform=platform,
         )
+        if environment is not None:
+            outcome["environment"] = environment
+        return outcome
 
     if aria2 is None:
         raise HostToolError(
@@ -691,7 +752,17 @@ def _tool_interpreter(name, environ):
 
 
 def _uv_install(
-    uv, asset, release, artifact, runner, *, allow_network, interpreter=None
+    uv,
+    asset,
+    release,
+    artifact,
+    runner,
+    *,
+    allow_network,
+    interpreter=None,
+    with_packages=(),
+    environ=None,
+    reinstall_main=False,
 ):
     """Install the verified artifact through uv's own tool environment."""
     command = [uv, "--no-config"]
@@ -702,6 +773,10 @@ def _uv_install(
     if interpreter:
         # The interpreter is named, not guessed by the backend.
         command += ["--python", str(interpreter)]
+    for requirement in with_packages:
+        command += ["--with", requirement]
+    if reinstall_main:
+        command += ["--reinstall-package", asset.package or asset.tool_id]
     command += [str(artifact)]
     result = runner(
         command,
@@ -710,13 +785,24 @@ def _uv_install(
         text=True,
         timeout=600,
         check=False,
-        env=dict(os.environ),
+        env=_run_env(environ or {}),
     )
     if result.returncode != 0:
         raise HostToolError(
             "uv_install_failed",
             (result.stderr or result.stdout or "")[:300],
         )
+
+
+def _inspect_packages(uv, asset, environ, runner):
+    try:
+        return inspect_uv_tool(
+            uv, asset.package or asset.tool_id, environ=environ, runner=runner
+        )
+    except ValueError, TypeError, OSError, subprocess.SubprocessError:
+        raise HostToolError(
+            "environment_unverified", "cannot verify the selected uv tool environment"
+        ) from None
 
 
 def _expose_native_entry(tool_id, payload, root, environ=None, platform=None):
@@ -1120,6 +1206,7 @@ def uninstall_tool(tool_id, *, root=None, uv="uv", environ=None, runner=subproce
             text=True,
             timeout=120,
             check=False,
+            env=_run_env(environ),
         )
         if result.returncode != 0:
             raise HostToolError(

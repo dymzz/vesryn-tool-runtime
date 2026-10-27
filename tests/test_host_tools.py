@@ -191,7 +191,7 @@ def test_missing_python_cli_installed_via_uv_and_registered(env, monkeypatch):
     monkeypatch.setattr(host_tools, "_verified_artifact", fake_artifact)
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             calls.append(argv)
             # The install makes the command resolvable.
             make_command(env["bin"], "vulture", "vulture 2.16")
@@ -232,7 +232,7 @@ def test_the_offline_requirement_reaches_the_backend(env, monkeypatch):
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             calls.append(argv)
             make_command(env["bin"], "vulture", "vulture 2.16")
             return subprocess.CompletedProcess(argv, 0, "", "")
@@ -266,7 +266,7 @@ def test_the_tool_interpreter_is_stated_not_guessed(env, monkeypatch):
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             calls.append(argv)
             make_command(env["bin"], "vulture", "vulture 2.16")
             return subprocess.CompletedProcess(argv, 0, "", "")
@@ -563,7 +563,7 @@ def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             calls.append(argv)
             make_command(env["bin"], "vulture", "vulture 2.16")
             return subprocess.CompletedProcess(argv, 0, "", "")
@@ -680,7 +680,7 @@ def test_the_ownership_lookup_compares_the_entry_as_a_path(env, monkeypatch):
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             make_command(env["bin"], "vulture", "vulture 2.16")
             return subprocess.CompletedProcess(argv, 0, "", "")
         return run_real(argv, **kwargs)
@@ -719,7 +719,7 @@ def test_the_ownership_lookup_finds_an_entry_recorded_in_another_case(env, monke
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             make_command(env["bin"], "vulture", "vulture 2.16")
             return subprocess.CompletedProcess(argv, 0, "", "")
         return run_real(argv, **kwargs)
@@ -806,7 +806,7 @@ def test_a_switched_version_does_not_inherit_the_verification_state(env, monkeyp
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             make_command(env["bin"], "vulture", "vulture 2.16")
             return subprocess.CompletedProcess(argv, 0, "", "")
         return run_real(argv, **kwargs)
@@ -847,7 +847,7 @@ def test_a_failed_uninstall_keeps_the_registration(env, monkeypatch):
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             make_command(env["bin"], "vulture", "vulture 2.16")
             return subprocess.CompletedProcess(argv, 0, "", "")
         return run_real(argv, **kwargs)
@@ -1105,7 +1105,7 @@ def test_install_is_verified_against_the_running_entry(env, monkeypatch):
     )
 
     def shadowing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             # The install leaves an OLDER entry first on PATH.
             make_command(env["bin"], "vulture", "vulture 2.14")
             return subprocess.CompletedProcess(argv, 0, "", "")
@@ -1169,7 +1169,7 @@ def test_uninstall_gives_uv_the_package_name(env, monkeypatch):
     )
 
     def installing_uv(argv, **kwargs):
-        if "tool" in argv:
+        if isinstance(argv, list) and "tool" in argv:
             make_command(env["bin"], "lint-imports", "lint-imports 2.15")
             return subprocess.CompletedProcess(argv, 0, "", "")
         return run_real(argv, **kwargs)
