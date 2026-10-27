@@ -15,6 +15,19 @@ Use vesryn-log's public EventSink protocol, allowlist safe event fields, and rep
 recording failures independently. Never log parameters or raw adapter diagnostics.
 
 
+## Architecture Documentation
+
+Code, types, schemas, and structured relationships are primary documentation; prose records only contracts, boundaries, and decisions that code and structure cannot express.
+
+For architecture planning and traceability tasks, use the
+[documentation-traceability](.agents/skills/documentation-traceability/SKILL.md) skill and relevant current docs.
+
+Use [architecture-decision-record-skill](.agents/skills/architecture-decision-record-skill/SKILL.md) when a significant decision, or a revision/supersession of an existing one, merits an ADR. Do not create ADRs for routine changes.
+
+External plan chapters are design inputs only when supplied
+for the task; they are not automatically current repo contracts.
+
+
 ## Delivery
 
 - PR merging is authorized for this repository after task acceptance, code review and required CI checks on the current head.
