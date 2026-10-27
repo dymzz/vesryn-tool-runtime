@@ -402,45 +402,24 @@ def test_the_gil_interpreters_come_from_uv_own_listing(env):
     """
     from vesryn_tool_runtime import host_tools
 
-    listing = json.dumps(
-        [
-            {
-                "key": "cpython-3.14.3-windows-x86_64-none",
-                "version": "3.14.3",
-                "variant": "default",
-                "implementation": "cpython",
-                "path": "C:/python314/python.exe",
-            },
-            {
-                "key": "cpython-3.14.8+freethreaded-windows-x86_64-none",
-                "version": "3.14.8",
-                "variant": "freethreaded",
-                "implementation": "cpython",
-                "path": "C:/python314t/python.exe",
-            },
-            {
-                "key": "cpython-3.14.3-windows-x86_64-none",
-                "version": "3.14.3",
-                "variant": "default",
-                "implementation": "cpython",
-                "path": "C:/uv/python/cpython-3.14.3/python.exe",
-            },
-            {
-                "key": "cpython-3.13.5-windows-x86_64-none",
-                "version": "3.13.5",
-                "variant": "default",
-                "implementation": "cpython",
-                "path": "C:/python313/python.exe",
-            },
-            {
-                "key": "cpython-3.15.0-windows-x86_64-none",
-                "version": "3.15.0",
-                "variant": "default",
-                "implementation": "cpython",
-                "path": None,
-            },
-        ]
-    )
+    def entry(version, variant, path, implementation="cpython"):
+        marker = "" if variant == "default" else f"+{variant}"
+        return {
+            "key": f"cpython-{version}{marker}-windows-x86_64-none",
+            "version": version,
+            "variant": variant,
+            "implementation": implementation,
+            "path": path,
+        }
+
+    # The fixture names each interpreter once; the expectation is read back
+    # from it, so a changed fixture needs no new literal here.
+    ordinary = entry("3.14.3", "default", "ordinary")
+    managed = entry("3.14.3", "default", "managed")
+    freethreaded = entry("3.14.8", "freethreaded", "freethreaded")
+    other_version = entry("3.13.5", "default", "other-version")
+    downloadable = entry("3.15.0", "default", None)
+    listing = json.dumps([ordinary, managed, freethreaded, other_version, downloadable])
     calls = []
 
     def listing_uv(argv, **kwargs):
@@ -448,8 +427,8 @@ def test_the_gil_interpreters_come_from_uv_own_listing(env):
         return subprocess.CompletedProcess(argv, 0, listing, "")
 
     assert host_tools._uv_interpreters("uv", env["environ"], "3.14", listing_uv) == [
-        "C:/python314/python.exe",
-        "C:/uv/python/cpython-3.14.3/python.exe",
+        ordinary["path"],
+        managed["path"],
     ]
     assert calls == [["uv", "python", "list", "--output-format", "json"]]
 
