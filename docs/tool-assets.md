@@ -8,17 +8,17 @@ This document defines CLI asset contracts, targets, version resolution, local re
 
 `AssetRelease` fields:
 
-| Field | Meaning |
-| --- | --- |
-| `version` | Exact publisher version. `latest`, `stable`, `default`, `current` are rejected. Independent of `ToolSpec.contract_version`. |
-| `distribution` | `python`, `native`, or an existing `oci` reference. |
-| `backend` | `uv`, `aria2`, or `oci`, respectively. An acquisition identifier; never a capability Provider. |
-| `source` | HTTPS/file artifact URL without embedded credentials, query or fragment; OCI source must end in its exact `@sha256:…` digest. A definition does not establish backend support or readiness. |
-| `sha256` | Full lowercase SHA-256 of the distribution artifact. For OCI, its pinned digest. This is distinct from hashes of extracted entry files. |
-| `entrypoint` | CLI entry name, without arguments or path traversal. |
-| `os`, `arch`, `abi` | Declared target constraints. Native/OCI require explicit OS and architecture; Python universal artifacts may use `any`. An ABI constraint requires an exact target match. For Linux, `abi` carries the C library: `gnu` (glibc) or `musl`; a `manylinux` wheel declares `gnu`, a `musllinux` wheel `musl`, and an absent ABI means the artifact is genuinely unconstrained — not that any libc matches. |
-| `package`, `requires_python` | Required for Python distributions: package name and PEP 440 interpreter constraint. Target interpreter version must be supplied explicitly. |
-| `lock_ref` | Optional publisher-owned immutable lock reference. Not copied uv metadata or a takeover of the consumer's project lock. |
+| Field                        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`                    | Exact publisher version. `latest`, `stable`, `default`, `current` are rejected. Independent of `ToolSpec.contract_version`.                                                                                                                                                                                                                                                                             |
+| `distribution`               | `python`, `native`, or an existing `oci` reference.                                                                                                                                                                                                                                                                                                                                                     |
+| `backend`                    | `uv`, `aria2`, or `oci`, respectively. An acquisition identifier; never a capability Provider.                                                                                                                                                                                                                                                                                                          |
+| `source`                     | HTTPS/file artifact URL without embedded credentials, query or fragment; OCI source must end in its exact `@sha256:…` digest. A definition does not establish backend support or readiness.                                                                                                                                                                                                             |
+| `sha256`                     | Full lowercase SHA-256 of the distribution artifact. For OCI, its pinned digest. This is distinct from hashes of extracted entry files.                                                                                                                                                                                                                                                                 |
+| `entrypoint`                 | CLI entry name, without arguments or path traversal.                                                                                                                                                                                                                                                                                                                                                    |
+| `os`, `arch`, `abi`          | Declared target constraints. Native/OCI require explicit OS and architecture; Python universal artifacts may use `any`. An ABI constraint requires an exact target match. For Linux, `abi` carries the C library: `gnu` (glibc) or `musl`; a `manylinux` wheel declares `gnu`, a `musllinux` wheel `musl`, and an absent ABI means the artifact is genuinely unconstrained — not that any libc matches. |
+| `package`, `requires_python` | Required for Python distributions: package name and PEP 440 interpreter constraint. Target interpreter version must be supplied explicitly.                                                                                                                                                                                                                                                             |
+| `lock_ref`                   | Optional publisher-owned immutable lock reference. Not copied uv metadata or a takeover of the consumer's project lock.                                                                                                                                                                                                                                                                                 |
 
 The release declaration's **ordered tuple** is the default preference order. The first compatible release satisfying consumer requirements and current policy is chosen. The publisher changes the declaration/revision to advance that default; an approval does not permanently freeze today's version. There is no implicit network query, numeric-version sorting, host detection or installed-version lookup. An explicit `version` matches literal publisher versions; `specifier` uses PEP 440. Non-PEP-440 native versions can still be selected exactly or by published default.
 
@@ -113,7 +113,7 @@ receipt = prepare_tool(
     version="9.2.0",
     command="sphinx-build",
     description="Build the project's Sphinx documentation",
-    with_packages=("myst-parser==5.1.0", "sphinx-needs==9.1.0"),
+    with_packages=("myst-parser==5.1.0", "sphinx-needs==9.1.0", "sphinx-codelinks==2.0.1"),
     allow_network=True,
 )
 ```
@@ -252,17 +252,17 @@ An invalid index is refused and never overwritten automatically. Index writes ha
 
 `AssetError` extends existing `ToolRuntimeError` and exposes `.code`:
 
-| Code | Meaning |
-| --- | --- |
-| `unregistered_tool` / `unregistered_asset` | Missing capability / missing CLI association; distinct from a local cache miss. |
-| `unsupported_target` | No declared OS/architecture/ABI/interpreter-compatible release. |
-| `selection_disabled` / `no_matching_version` | Current policy disables selection / no release satisfies exact version and constraints. |
-| `invalid_selection` / `selection_target_mismatch` | Invalid frozen snapshot or its digest / view target differs from the caller's choice. |
-| `backend_unknown` | Required backend facts absent or no verifier exists; never backend readiness. |
-| `local_missing` / `integrity_mismatch` | Entry files missing / source or entry checksum differs. |
-| `invalid_location` / `invalid_receipt` | Locator containment/layout or receipt structure is invalid. |
-| `invalid_index` / `index_busy` | Corrupt/unsupported local document / another writer holds its lock past timeout. |
-| `invalid_definition`, `invalid_digest`, `invalid_source`, `mutable_source`, `mutable_version`, `invalid_backend`, `invalid_target`, `invalid_policy`, `invalid_requirement`, `conflicting_asset` | Invalid release/policy/registration inputs; no installation is attempted. |
+| Code                                                                                                                                                                                             | Meaning                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `unregistered_tool` / `unregistered_asset`                                                                                                                                                       | Missing capability / missing CLI association; distinct from a local cache miss.         |
+| `unsupported_target`                                                                                                                                                                             | No declared OS/architecture/ABI/interpreter-compatible release.                         |
+| `selection_disabled` / `no_matching_version`                                                                                                                                                     | Current policy disables selection / no release satisfies exact version and constraints. |
+| `invalid_selection` / `selection_target_mismatch`                                                                                                                                                | Invalid frozen snapshot or its digest / view target differs from the caller's choice.   |
+| `backend_unknown`                                                                                                                                                                                | Required backend facts absent or no verifier exists; never backend readiness.           |
+| `local_missing` / `integrity_mismatch`                                                                                                                                                           | Entry files missing / source or entry checksum differs.                                 |
+| `invalid_location` / `invalid_receipt`                                                                                                                                                           | Locator containment/layout or receipt structure is invalid.                             |
+| `invalid_index` / `index_busy`                                                                                                                                                                   | Corrupt/unsupported local document / another writer holds its lock past timeout.        |
+| `invalid_definition`, `invalid_digest`, `invalid_source`, `mutable_source`, `mutable_version`, `invalid_backend`, `invalid_target`, `invalid_policy`, `invalid_requirement`, `conflicting_asset` | Invalid release/policy/registration inputs; no installation is attempted.               |
 
 Host tool operations raise `HostToolError`, with specific failure codes including `conflict`, `missing_release`, `unsupported_target`, `backend_required`, `install_failed`, `uninstall_failed`, and `registered_not_synced`.
 
