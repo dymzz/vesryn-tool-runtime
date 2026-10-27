@@ -117,6 +117,7 @@ receipt = prepare_tool(
         "myst-parser==5.1.0",
         "sphinx-needs==9.1.0",
         "sphinx-codelinks==2.0.1",
+        "sphinx-test-reports==3.0.1"
     ),
     allow_network=True,
 )
