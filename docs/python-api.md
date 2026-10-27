@@ -2,7 +2,11 @@
 
 This document describes the currently supported public API groups, essential behavioral contracts, failure semantics, and usage patterns in `vesryn_tool_runtime`.
 
-> **Note**: Exhaustive, symbol-level API reference documentation is generated from docstrings and type annotations via Sphinx AutoAPI in subsequent documentation tooling integration.
+> **Note**: The exhaustive, symbol-level API reference is generated from the
+> package source by Sphinx AutoAPI and published as
+> {doc}`AutoAPI reference <autoapi/index>`. This page keeps the behavioural
+> contracts, the failure semantics and the ownership boundaries; the reference
+> keeps the signatures and the types.
 
 Import all public symbols directly from `vesryn_tool_runtime`.
 
@@ -156,18 +160,12 @@ if receipt["status"] == "registered_not_synced":
     refresh_tools()
 ```
 
-For plugins in one Python CLI environment, explicitly select pinned packages:
-
-```python
-receipt = prepare_tool(
-    "sphinx",
-    version="9.2.0",
-    command="sphinx-build",
-    description="Build Sphinx documentation",
-    allow_network=True,
-    with_packages=("myst-parser==5.1.0", "sphinx-needs==9.1.0"),
-)
-```
+For plugins in one Python CLI environment, the explicit `with_packages` list is
+the complete requirement set: a call that names fewer packages reconciles the
+others out of the prepared environment. The pinned set for this project's manual
+is declared once, in the single complete example of
+[Python CLI plugins in the same tool environment](tool-assets.md#python-cli-plugins-in-the-same-tool-environment),
+and is not restated here.
 
 `with_packages=None` keeps legacy behavior; explicit `()` removes additional
 requests through uv's own reconciliation. A same-version CLI is not a plugin

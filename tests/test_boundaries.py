@@ -39,6 +39,23 @@ def test_package_has_no_reverse_imports_or_workflow_dependencies():
             )
 
 
+def test_exported_names_are_defined_in_public_modules():
+    """The package root promises the public entry; a private module never holds it.
+
+    The generated API reference hides single-underscore modules. A promised
+    name defined in one of them would therefore be unreachable, so the
+    promise is checked here instead of being read off the reference.
+    """
+    for name in vesryn_tool_runtime.__all__:
+        value = getattr(vesryn_tool_runtime, name)
+        module = getattr(value, "__module__", "")
+        if not module:
+            continue
+        assert not module.rsplit(".", 1)[-1].startswith("_"), (
+            f"{name} is defined in the private module {module}"
+        )
+
+
 @pytest.mark.parametrize(
     "raw", [b'{"a":1,"a":2}', b'{"a":NaN}', b"[]", b'{"a":Infinity}']
 )
