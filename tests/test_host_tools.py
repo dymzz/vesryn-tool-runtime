@@ -6,6 +6,7 @@ import sys
 from pathlib import Path, PurePosixPath
 
 import pytest
+from ub_test_reports.pytest_plugin import add_test_properties
 
 from vesryn_tool_runtime import (
     HostToolError,
@@ -697,6 +698,7 @@ def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
 
 
 @pytest.mark.parametrize("changed", ["digest", "source"])
+@add_test_properties(verifies=["SPEC_TR_MAIN_ARTIFACT_PROOF"])
 def test_cached_replacement_is_not_installation_proof(env, monkeypatch, changed):
     """A cached B must never claim that the current entry was installed from B."""
     asset_a, _release_a, cached_a = _synthetic_declaration(env)
