@@ -15,6 +15,15 @@ Use vesryn-log's public EventSink protocol, allowlist safe event fields, and rep
 recording failures independently. Never log parameters or raw adapter diagnostics.
 
 
+## Architecture decisions
+
+For an important architecture decision, a revision or supersession of an existing
+one, or an explicit request for an ADR, use the
+[architecture-decision-record-skill](.agents/skills/architecture-decision-record-skill/SKILL.md)
+in `.agents/skills/`. Ordinary bug fixes, dependency updates and local
+implementations do not need an ADR.
+
+
 ## Delivery
 
 - PR merging is authorized for this repository after task acceptance, code review and required CI checks on the current head.
