@@ -341,14 +341,11 @@ def test_a_plugin_set_names_a_gil_enabled_interpreter(env, monkeypatch):
 
     # A pure-python wheel WITH a plugin set: the plugin's own artifacts have
     # to load in that environment, so the GIL-enabled build is named.
-    assert (
-        host_tools._tool_interpreter(
-            "sphinx-9.2.0-py3-none-any.whl",
-            env["environ"],
-            ("sphinx-codelinks==2.0.1",),
-        )
-        == str(other)
-    )
+    assert host_tools._tool_interpreter(
+        "sphinx-9.2.0-py3-none-any.whl",
+        env["environ"],
+        ("sphinx-codelinks==2.0.1",),
+    ) == str(other)
     # Without a plugin set the running interpreter is kept.
     assert (
         host_tools._tool_interpreter("sphinx-9.2.0-py3-none-any.whl", env["environ"])

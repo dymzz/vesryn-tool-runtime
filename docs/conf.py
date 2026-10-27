@@ -14,7 +14,7 @@ project = _project["name"]
 release = _project["version"]
 version = release
 
-extensions = ["myst_parser", "sphinx_needs"]
+extensions = ["myst_parser", "sphinx_needs", "sphinx_codelinks"]
 source_suffix = {".md": "markdown"}
 root_doc = "README"
 exclude_patterns = ["superpowers/**"]
