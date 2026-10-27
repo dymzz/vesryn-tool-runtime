@@ -13,6 +13,7 @@
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): authoritative C1–C8 acceptance standards.
 - [Changelog](changelog.md): versioned changes and compatibility notes.
+- [Architecture decisions](adr/persist-installation-provenance.md): standalone ADRs linked to specifications via Sphinx-Needs.
 - [Semgrep OCI execution evidence](verification/tr-asset-ci-01d-semgrep/README.md): unabridged Dagger native execution capture.
 
 ```{toctree}
@@ -21,6 +22,7 @@
 :maxdepth: 2
 
 *
+adr/*
 delivery/*
 verification/tr-asset-ci-01d-semgrep/README
 ```
@@ -37,14 +39,24 @@ sphinx-build -b html -n -W --keep-going -d .tmp/docs/doctrees docs .tmp/docs/htm
 ```
 
 The same HTML build writes `README.html` and `needs.json` under `.tmp/docs/html`.
-Project/version metadata comes from `pyproject.toml`. The minimal trace is the
-existing main-artifact proof specification and installation-provenance decision
-in [host tools](tool-assets.md#main-artifact-provenance), with a typed `satisfies`
-relationship whose targets must be specifications. Need references and relation
-types are checked by Sphinx-Needs; `-n` alone does not guarantee these semantics.
-`-W` makes their warnings fail the build. Planning documents under `superpowers/`
-are not part of this public manual; generated files stay in the ignored temporary
-directory. Existing Mermaid fences render as source text in HTML and as diagrams
-on GitHub.
+Project/version metadata comes from `pyproject.toml`. Standalone ADRs live under
+`docs/adr/<imperative-verb-phrase>.md` and wrap their full Nygard decision body
+(`Context`, `Decision`, `Consequences`) inside a MyST `:::{adr}` colon fence so
+`needs.json` exports the complete decision content (`content`).
+
+Each ADR maintains its authoritative status solely in `:status:` (`proposed`,
+`accepted`, `rejected`, `superseded`, or `deprecated`, enforced as non-nullable by
+`needs_types["adr"]["fields"]["status"]` in `docs/conf.py`) and links to
+specifications through `:decides:` (for example,
+[Persist Installation Provenance](adr/persist-installation-provenance.md) decides
+`SPEC_TR_MAIN_ARTIFACT_PROOF` in [host tools](tool-assets.md#main-artifact-provenance)).
+Clarifications that preserve an existing decision update the ADR in place;
+changes that replace an accepted decision create a new ADR with `:supersedes:`
+targeting the prior `ADR_` ID and set the old ADR's `:status:` to `superseded`.
+Need references, target types, and field schemas are checked by Sphinx-Needs;
+`-n` alone does not guarantee these semantics. `-W` makes their warnings fail the
+build. Planning documents under `superpowers/` are not part of this public manual;
+generated files stay in the ignored temporary directory. Existing Mermaid fences
+render as source text in HTML and as diagrams on GitHub.
 
 Up: [Repository](https://github.com/dymzz/vesryn-tool-runtime).

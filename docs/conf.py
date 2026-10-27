@@ -18,11 +18,13 @@ extensions = ["myst_parser", "sphinx_needs"]
 source_suffix = {".md": "markdown"}
 root_doc = "README"
 exclude_patterns = ["superpowers/**"]
+myst_enable_extensions = ["colon_fence"]
 myst_heading_anchors = 6
 html_theme = "alabaster"
 
 needs_id_required = True
 needs_build_json = True
+needs_reproducible_json = True
 needs_schema_validation_enabled = True
 needs_types = [
     {
@@ -38,13 +40,34 @@ needs_types = [
         "prefix": "ADR_",
         "color": "#BFD8D2",
         "style": "node",
+        "fields": {
+            "status": {
+                "schema": {
+                    "enum": [
+                        "proposed",
+                        "accepted",
+                        "rejected",
+                        "superseded",
+                        "deprecated",
+                    ],
+                },
+                "nullable": False,
+            },
+        },
         "links": {
-            "satisfies": {
-                "incoming": "is satisfied by",
-                "outgoing": "satisfies",
+            "decides": {
+                "incoming": "is decided by",
+                "outgoing": "decides",
                 "copy": False,
                 "allow_dead_links": False,
                 "target_types": ["spec"],
+            },
+            "supersedes": {
+                "incoming": "is superseded by",
+                "outgoing": "supersedes",
+                "copy": False,
+                "allow_dead_links": False,
+                "target_types": ["adr"],
             },
         },
     },

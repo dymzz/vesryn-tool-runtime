@@ -33,11 +33,12 @@ build/
 .unregistered/
 /.unregistered/
 .agent/
-# Local plugin installs and agent state stay untracked; the vendored ADR
-# Skill is a repository asset and is tracked.
+# Local plugin installs and agent state stay untracked; repository skills
+# under .agents/skills/ are tracked explicitly.
 .agents/*
 !.agents/skills/
 .agents/skills/*
 !.agents/skills/architecture-decision-record-skill/
+!.agents/skills/documentation-traceability/
 .test-tools/
 .issue-*.md
