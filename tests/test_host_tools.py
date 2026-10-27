@@ -318,6 +318,55 @@ def test_a_compiled_wheel_names_a_gil_enabled_interpreter(env, monkeypatch):
     )
 
 
+def test_a_plugin_set_names_a_gil_enabled_interpreter(env, monkeypatch):
+    """A plugin set lands in the same environment and must load there too.
+
+    Published plugin wheels are commonly GIL-bound — a cpXY build or the
+    stable ABI — and a free-threaded interpreter cannot load them: the
+    backend would have to build the plugin from source instead.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    other = env["bin"] / "python.exe"
+    other.write_bytes(b"interpreter")
+
+    facts = {
+        sys.executable: (3, 14, False),
+        str(other): (3, 14, True),
+    }
+    monkeypatch.setattr(
+        host_tools, "_interpreter_facts", lambda executable: facts.get(str(executable))
+    )
+    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [str(other)])
+
+    # A pure-python wheel WITH a plugin set: the plugin's own artifacts have
+    # to load in that environment, so the GIL-enabled build is named.
+    assert (
+        host_tools._tool_interpreter(
+            "sphinx-9.2.0-py3-none-any.whl",
+            env["environ"],
+            ("sphinx-codelinks==2.0.1",),
+        )
+        == str(other)
+    )
+    # Without a plugin set the running interpreter is kept.
+    assert (
+        host_tools._tool_interpreter("sphinx-9.2.0-py3-none-any.whl", env["environ"])
+        == sys.executable
+    )
+    # A host without a GIL-enabled interpreter keeps the running one: the
+    # plugin set may be pure Python, and that is not refused over.
+    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [])
+    assert (
+        host_tools._tool_interpreter(
+            "sphinx-9.2.0-py3-none-any.whl",
+            env["environ"],
+            ("sphinx-codelinks==2.0.1",),
+        )
+        == sys.executable
+    )
+
+
 def test_no_interpreter_that_can_load_the_wheel_is_a_stable_reason(env, monkeypatch):
     """A host without a GIL-enabled interpreter reports a stable reason."""
     from vesryn_tool_runtime import host_tools

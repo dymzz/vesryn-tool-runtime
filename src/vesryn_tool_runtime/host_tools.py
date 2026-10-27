@@ -429,7 +429,7 @@ def prepare_tool(
         artifact = _verified_artifact(
             asset, release, allow_network=allow_network, environ=environ
         )
-        interpreter = _tool_interpreter(artifact.name, environ)
+        interpreter = _tool_interpreter(artifact.name, environ, packages or ())
         if interpreter is None:
             # No interpreter on this host can load the artifact's extensions.
             raise HostToolError(
@@ -726,7 +726,7 @@ def _path_interpreters(environ):
                 yield str(candidate)
 
 
-def _tool_interpreter(name, environ):
+def _tool_interpreter(name, environ, packages=()):
     """The interpreter that builds the tool environment — named, not guessed.
 
     uv picks an interpreter on its own when none is named, and on a
@@ -736,18 +736,35 @@ def _tool_interpreter(name, environ):
     interpreter is therefore named — the running one when it can load the
     artifact, otherwise a GIL-enabled interpreter of the SAME version from
     the target PATH. None means no interpreter can load it.
+
+    A requested plugin set is installed into the SAME environment, so the
+    interpreter has to load its artifacts too. Published plugin wheels are
+    commonly GIL-bound — a cpXY build or the stable ABI — which a
+    free-threaded interpreter cannot load: naming the running one leaves the
+    backend to build the plugin from source. With plugins requested, a
+    GIL-enabled interpreter of the same version is therefore named. The
+    running one is kept when nothing compiled goes into the environment, and
+    when no such interpreter exists the install is not refused over it.
     """
     running = sys.executable
     facts = _interpreter_facts(running)
     if facts is None:
         return running
-    if facts[2] or _pure_python_artifact(name):
+    if facts[2]:
+        # The running interpreter loads GIL-bound wheels.
+        return running
+    if not packages and _pure_python_artifact(name):
+        # Nothing compiled is going into the environment.
         return running
     for candidate in _path_interpreters(environ):
         other = _interpreter_facts(candidate)
         if other is None or other[:2] != facts[:2] or not other[2]:
             continue
         return candidate
+    if _pure_python_artifact(name):
+        # The plugin set may be pure Python after all: keep the running
+        # interpreter rather than refuse an install that could succeed.
+        return running
     return None
 
 
@@ -962,6 +979,7 @@ def _register(
     platform=None,
 ):
     release = _declared_release(asset, version, platform)
+    # @need-ids: SPEC_TR_MAIN_ARTIFACT_PROOF
     source_verified = bool(
         release is not None
         and verified_source == release.source
