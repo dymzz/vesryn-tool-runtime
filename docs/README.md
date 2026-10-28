@@ -12,6 +12,7 @@
 - [Dagger package delivery](dagger.md): fixed-revision wheel delivery for executors.
 - [Consumer migration](consumers.md): compatibility paths and development source inputs.
 - [Release readiness criteria](delivery/release-readiness.md): authoritative C1–C8 acceptance standards.
+- [Release note candidates](delivery/release-notes.md): fixed Git inputs, delivery semantics and native git-cliff projection.
 - [Changelog](changelog.md): versioned changes and compatibility notes.
 - [Architecture decisions](adr/persist-installation-provenance.md): standalone ADRs linked to specifications via Sphinx-Needs.
 - [Test evidence](test-evidence.md): test cases converted from a real JUnit report, linked to the specifications they verify.

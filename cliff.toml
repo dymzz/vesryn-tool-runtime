@@ -1,0 +1,48 @@
+[changelog]
+body = """
+## {{ version | default(value="unreleased") }} — release note candidates
+
+These entries describe commits, not verified delivery. Check the target tree and
+exclude changes that were reverted or superseded before publishing.
+
+### Potential breaking changes
+{% for commit in commits -%}
+{% if commit.breaking is defined and commit.breaking -%}
+{% if commit.breaking_description is defined and commit.breaking_description -%}
+- {{ commit.breaking_description | trim }} ([{{ commit.id | truncate(length=8, end="") }}](https://github.com/dymzz/vesryn-tool-runtime/commit/{{ commit.id }}))
+{% else -%}
+- {{ commit.message | split(pat="\n") | first | trim }} ([{{ commit.id | truncate(length=8, end="") }}](https://github.com/dymzz/vesryn-tool-runtime/commit/{{ commit.id }}))
+{% endif -%}
+{% endif -%}
+{% endfor %}
+
+### Release-Note footers
+{% for commit in commits -%}
+{% if commit.footers is defined -%}
+{% for footer in commit.footers -%}
+{% if footer.token == "Release-Note" -%}
+- {{ footer.value | trim }} ([{{ commit.id | truncate(length=8, end="") }}](https://github.com/dymzz/vesryn-tool-runtime/commit/{{ commit.id }}))
+{% endif -%}
+{% endfor -%}
+{% endif -%}
+{% endfor %}
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+commit_preprocessors = [
+  { pattern = '^Merge ', replace = 'chore(merge): Merge ' },
+]
+commit_parsers = [
+  { footer = '^BREAKING CHANGE:', group = 'Breaking' },
+  { footer = '^Release-Note:', group = 'Release-Note' },
+  { message = '.*', group = 'Other' },
+]
+filter_commits = false
+# A caller-specified range is one candidate; other tags must not split it.
+ignore_tags = '.*'
+topo_order_commits = true
+sort_commits = "oldest"
