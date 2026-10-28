@@ -84,6 +84,13 @@ Verified artifacts (such as fetched Python wheels) live in the asset root (`%LOC
 - **Verified Python Installation**: For runtime-managed installations, the selected artifact is verified against the publisher digest before installation (`uv tool install <verified artifact>`). An unverifiable wheel is never installed.
 - **Safe Uninstallation**: `uv` ownership permits removal through uv; `aria2` ownership permits removal of the runtime exposure copy while cached artifacts remain. External installations are only unregistered. A failed backend uninstall retains the registration and reports `uninstall_failed`.
 
+For a uv-managed CLI without a version line, Runtime verifies the selected
+version and resolved entry against uv's environment inventory and requires
+consistent installed dependencies. If `--version` fails without reporting a
+version, `--help` must succeed before this fallback is allowed. Launch failures,
+a version printed with a nonzero exit, and failed help probes remain `conflict`.
+The same checks apply after installation and when reusing an existing entry.
+
 ### Installation verification
 
 The bundled `sphinx` asset declares Sphinx 9.2.0 (`sphinx-build`, Python

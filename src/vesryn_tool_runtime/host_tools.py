@@ -167,24 +167,22 @@ def _run_env(environ):
 def _probe(command, environ, runner):
     """Resolve and read the entry's own version line; read-only.
 
-    Returns ``(entry, output, status, detail)``. The status is ``"ok"``
-    when the entry ran and exited zero, ``"no_version"`` when it ran but
-    did not — a CLI whose argparse rejects the option still ran, and that
-    is a different fact from an entry that could not start at all
-    (``"not_launched"``). A version string printed by a failing command is
-    never read as a usable entry.
+    Returns ``(entry, output, status, detail)``. A missing version permits
+    fallback only after a successful probe: either ``--version`` exits zero
+    without a version or ``--help`` succeeds after a rejected version option.
+    A version printed by a failing command never establishes availability.
     """
     entry = _which(command, environ)
     if entry is None:
         return None, None, "missing", "not resolvable in the target shell"
-    if entry.lower().endswith((".bat", ".cmd")):
-        # cmd.exe needs the whole line quoted, otherwise a path with
-        # spaces is split into two arguments.
-        argv = f'cmd /c ""{entry}" --version"'
-    else:
-        argv = [entry, "--version"]
-    try:
-        result = runner(
+
+    def run(option):
+        if entry.lower().endswith((".bat", ".cmd")):
+            # cmd.exe needs the whole line quoted for paths with spaces.
+            argv = f'cmd /c ""{entry}" {option}"'
+        else:
+            argv = [entry, option]
+        return runner(
             argv,
             stdin=subprocess.DEVNULL,
             capture_output=True,
@@ -193,14 +191,25 @@ def _probe(command, environ, runner):
             check=False,
             env=_run_env(environ),
         )
+
+    try:
+        result = run("--version")
     except OSError, subprocess.SubprocessError:
         return entry, None, "not_launched", "version probe could not run"
     output = (result.stdout or "").strip()
     if not output:
         output = (result.stderr or "").strip()
     if result.returncode != 0:
-        return entry, output, "no_version", f"version probe exited {result.returncode}"
-    return entry, output, "ok", ""
+        detail = f"version probe exited {result.returncode}"
+        if not _reported_versions(output):
+            try:
+                if run("--help").returncode == 0:
+                    return entry, output, "no_version", detail
+            except OSError, subprocess.SubprocessError:
+                pass
+        return entry, output, "failed", detail
+    status = "ok" if _reported_versions(output) else "no_version"
+    return entry, output, status, ""
 
 
 def _reported_versions(text):
@@ -243,7 +252,9 @@ def _matched_version(reported, candidates):
     return None
 
 
-def _uv_entry_version(uv, asset, environ, runner, entry, version):
+def _uv_entry_version(
+    uv, asset, environ, runner, entry, version, *, require_consistent=True
+):
     """The version of a uv tool entry that prints no version line of its own.
 
     uv states the version of the environment it manages and the entries it
@@ -259,6 +270,10 @@ def _uv_entry_version(uv, asset, environ, runner, entry, version):
     except HostToolError:
         return None
     if observed is None:
+        return None
+    if require_consistent and not observed["environment"].get(
+        "dependencies_consistent", False
+    ):
         return None
     if not any(_same_entry(entry, path) for path in observed["entrypoints"]):
         return None
@@ -373,16 +388,11 @@ def prepare_tool(
     _upgrade_host_database(root)
     proof = (None, None)
 
-    # Probe the target shell FIRST: an already-resolvable entry is reused
-    # as-is, but only when the probe SUCCEEDED and the entry reports the
-    # SELECTED version. A same-name entry of another version — or an entry
-    # whose version probe failed — is an honest conflict: it is never
-    # overwritten and never silently registered under another version.
+    # Probe the target shell first. Failed probes and mismatched versions
+    # remain conflicts; a versionless CLI also needs uv's ownership evidence.
     entry, shown, status, probe_detail = _probe(command, environ, runner)
     if entry is not None:
-        if status == "not_launched":
-            # The entry could not be started at all: that failure is the
-            # fact about it, and no other source may paper over it.
+        if status in {"not_launched", "failed"}:
             return _outcome(
                 "conflict",
                 tool_id,
@@ -395,7 +405,17 @@ def prepare_tool(
             # The entry ran but printed no version. A uv tool states its
             # version in uv's own listing rather than on a version line,
             # so that is read next -- and only for the entry uv itself owns.
-            matched = _uv_entry_version(uv, asset, environ, runner, entry, version)
+            matched = _uv_entry_version(
+                uv,
+                asset,
+                environ,
+                runner,
+                entry,
+                version,
+                # An explicit package request can repair dependencies through
+                # uv; the resulting environment is checked before registration.
+                require_consistent=packages is None,
+            )
             if matched is None:
                 return _outcome(
                     "conflict",
@@ -501,9 +521,7 @@ def prepare_tool(
             raise HostToolError(
                 "install_incomplete", f"{command} not resolvable after uv install"
             )
-        if status == "not_launched":
-            # The freshly installed entry could not be started at all: that
-            # failure is the fact, and nothing is registered from it.
+        if status in {"not_launched", "failed"}:
             return _outcome(
                 "conflict",
                 tool_id,
