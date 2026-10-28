@@ -51,6 +51,11 @@ resolves:
 sphinx-build -b html -n -W --keep-going -d .tmp/docs/doctrees docs .tmp/docs/html
 ```
 
+Build from a Git checkout of the revision being documented. For an isolated
+candidate, use a Git worktree: an archive extracted below another checkout
+inherits its Git root, and CodeLinks then includes the temporary directory in
+the source URLs. Check that exported `code_url` paths exist in the named commit.
+
 The same HTML build writes `README.html` and `needs.json` under `.tmp/docs/html`.
 Project/version metadata comes from `pyproject.toml`. Standalone ADRs live under
 `docs/adr/<imperative-verb-phrase>.md` and wrap their full Nygard decision body
