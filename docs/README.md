@@ -78,4 +78,30 @@ build. Planning documents under `superpowers/` are not part of this public manua
 generated files stay in the ignored temporary directory. Existing Mermaid fences
 render as source text in HTML and as diagrams on GitHub.
 
+## Check this manual
+
+The strict build above checks the internal references and the Need relations:
+Sphinx resolves every docname and fragment, and Sphinx-Needs validates the
+link types and their targets.
+
+The manual's Python examples are executed, not only shown. The examples that
+need nothing but the package run with the project's tests; the ones that talk
+to the host — tool preparation, Dagger delivery — carry the `python .skip`
+marker in their fence and are left to the reader.
+
+```console
+uv run --locked pytest tests/test_doc_examples.py
+```
+
+The repository's file references are checked offline, so the check needs no
+network and answers the same everywhere. `lychee.toml` carries the per-host
+settings of the optional online run, which also checks the external links.
+
+```console
+lychee --no-progress --offline README.md docs
+```
+
+Markdown formatting and prose style are not checked here; those rules belong
+to the engineering checks.
+
 Up: [Repository](https://github.com/dymzz/vesryn-tool-runtime).

@@ -7,7 +7,7 @@ original 0.1.0 wheel. No consumer pin is changed here.
 
 ## Public entry points
 
-```python
+```text
 Aria2Source(executable: str, version: str, sha256: str)
 Aria2NativeBackend(index: AssetIndex, *, aria2: Aria2Source,
                    timeout=300, max_files=10000, max_bytes=536870912)
@@ -167,7 +167,7 @@ The sample's `dagger_directory(dag, delivery)` uses the existing
 `dagger_file(dag, delivery)` returns its `.file(delivery.entry)`. Consumers can
 import a read-only snapshot into their existing graph, for example:
 
-```python
+```python .skip
 payload = dagger_file(dag, backend.delivery(selection, policy=current_policy))
 container = container.with_file("/opt/tools/hyperfine", payload, permissions=0o755)
 ```
