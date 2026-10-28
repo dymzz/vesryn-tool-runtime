@@ -74,9 +74,8 @@ changes that replace an accepted decision create a new ADR with `:supersedes:`
 targeting the prior `ADR_` ID and set the old ADR's `:status:` to `superseded`.
 Need references, target types, and field schemas are checked by Sphinx-Needs;
 `-n` alone does not guarantee these semantics. `-W` makes their warnings fail the
-build. Planning documents under `superpowers/` are not part of this public manual;
-generated files stay in the ignored temporary directory. Existing Mermaid fences
-render as source text in HTML and as diagrams on GitHub.
+build. Generated files stay in the ignored temporary directory. Existing Mermaid
+fences render as source text in HTML and as diagrams on GitHub.
 
 ## Check this manual
 

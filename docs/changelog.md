@@ -1,5 +1,10 @@
 # Changelog
 
+This file records released versions, migration boundaries and references to
+release evidence. Artifact digests remain with their versioned release records.
+Release notes projected from commit history belong to the separate P5 delivery
+switch; this file is not a substitute for that mechanism.
+
 ## 0.1.0 — extraction candidate
 
 - Migrate authoritative tool contracts, Registry/discovery and Schema validation
@@ -8,8 +13,9 @@
   retain consumer-owned workflow associations and recovery.
 - Add independent single/batch invocation and explicit EventSink observations.
 - Integrate both consumers through compatibility exports and delegated dispatch.
-- No formal release or tag is created. Read readiness assessment
-  for verified paths and remaining publication work.
+- The extraction assessment preceded the formal tag. The
+  [v0.1.0 release](https://github.com/dymzz/vesryn-tool-runtime/releases/tag/v0.1.0)
+  records the published version.
 
 ## 0.2.0 — local tool assets
 

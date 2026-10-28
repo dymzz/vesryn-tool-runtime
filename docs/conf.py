@@ -26,7 +26,6 @@ extensions = [
 # to be a source suffix even though every authored page is Markdown.
 source_suffix = {".md": "markdown", ".rst": "restructuredtext"}
 root_doc = "README"
-exclude_patterns = ["superpowers/**"]
 myst_enable_extensions = ["colon_fence"]
 myst_heading_anchors = 6
 html_theme = "alabaster"

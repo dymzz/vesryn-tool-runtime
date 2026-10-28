@@ -1,28 +1,18 @@
 # Native assets through aria2
 
-This is the public handoff for [issue #8](https://github.com/dymzz/vesryn-tool-runtime/issues/8),
-TR-ASSET-01C, based on the [asset contracts](tool-assets.md) merged in source
-`f60eadd`. These additions are delivered in 0.2.0 and are not present in the
-original 0.1.0 wheel. No consumer pin is changed here.
+The aria2 backend prepares and verifies native assets selected through the
+[asset contracts](tool-assets.md). It is available starting with version 0.2.0;
+acquisition does not grant execution permission.
 
 ## Public entry points
 
-```text
-Aria2Source(executable: str, version: str, sha256: str)
-Aria2NativeBackend(index: AssetIndex, *, aria2: Aria2Source,
-                   timeout=300, max_files=10000, max_bytes=536870912)
-Aria2NativeBackend.prepare(selection: AssetSelection, *, policy: AssetPolicy,
-                          allow_network=False, source_artifact=None) -> AssetReceipt
-Aria2NativeBackend.delivery(selection: AssetSelection, *,
-                           policy: AssetPolicy) -> NativeAssetDelivery
-NativeAssetDelivery.directory -> Path
-NativeAssetDelivery.executable -> Path
-NativeAssetDelivery.entry -> str  # relative to directory
-NativeAssetDelivery.document() -> dict
-```
+`Aria2Source`, `Aria2NativeBackend` and `NativeAssetDelivery` are exported from
+`vesryn_tool_runtime`. Their signatures and types are in the
+{doc}`generated API reference <autoapi/index>`; this page keeps the behaviour,
+the failures and the ownership boundaries.
 
-These names are exported from `vesryn_tool_runtime`. Constructing a backend does
-not prepare anything. The host explicitly calls `prepare` after selecting through
+Constructing a backend does not prepare anything. The host explicitly calls
+`prepare` after selecting through
 the existing Catalog. Pass the **current** acquisition policy on every preparation
 and delivery, including reuse: a frozen old selection cannot override current
 disablement or an allowed-version constraint. Acquiring a tool, passing verification,

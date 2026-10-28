@@ -1,9 +1,7 @@
 # uv tool environments (TR-ASSET-01B)
 
-Public handoff for [issue #7](https://github.com/dymzz/vesryn-tool-runtime/issues/7),
-built on the [asset contracts](tool-assets.md) delivered by issue #6. These APIs are
-delivered in version `0.2.0`, after the #6 baseline `f60eadd`. The original
-`0.1.0` wheel does not contain these APIs.
+These APIs build on the [asset contracts](tool-assets.md) and are available
+starting with version 0.2.0.
 
 `UvToolBackend` is a thin adapter. **uv** resolves, downloads, verifies hashes,
 caches and builds the environment. This package never walks or edits uv's cache, has
@@ -11,26 +9,15 @@ no resolver and adds no service, database or scheduler.
 uv 0.12.23 is the verified acquisition toolchain; compatibility with other uv
 versions is not established by this release's evidence.
 
-## Public signatures
+## Public entry points
 
-Exported from `vesryn_tool_runtime`:
-
-```text
-UvToolBackend(index: AssetIndex, *, uv="uv", find_links=(), index_url=None,
-              timeout=900, runner=subprocess.run)
-UvToolBackend.uv_version() -> str
-UvToolBackend.lock(selection, *, policy, allow_network=False) -> UvLock
-UvToolBackend.prepare(selection, *, policy, allow_network=False) -> dict   # AssetReceipt.document()
-UvToolBackend.installed(selection, *, policy) -> dict
-UvToolBackend.command(catalog, selection, *, scope, policy) -> tuple[str, ...]
-UvLock.document() -> dict
-```
+`UvToolBackend` and `UvLock` are exported from `vesryn_tool_runtime`. Their
+signatures and types are in the {doc}`generated API reference <autoapi/index>`;
+this page keeps the behaviour, the failures and the ownership boundaries.
 
 Only `python` / `uv` releases (`AssetRelease.distribution/backend`) are accepted.
 Every operation requires the host's current `AssetPolicy`. Disablement and current
 version restrictions apply even to an older frozen selection and an offline hit.
-These required arguments refine the unreleased #7 prototype; no released 0.1 API
-changes. The historical #7 JSON records the prototype's original signatures.
 
 ## Two different results
 

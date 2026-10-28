@@ -53,19 +53,10 @@ The host tools module (`host_tools.py`) manages local tool preparation, registra
 
 ### Entry points
 
-Exported from `vesryn_tool_runtime`:
-
-```text
-default_tools() -> tuple[dict, ...]
-prepare_tool(tool_id, *, version=None, command=None, description=None,
-             root=None, allow_network=False, platform=None, uv="uv",
-             aria2=None, environ=None, runner=subprocess.run,
-             with_packages=None) -> dict
-refresh_tools(root=None, environ=None) -> int
-uninstall_tool(tool_id, *, root=None, uv="uv", environ=None,
-               runner=subprocess.run) -> dict
-user_data_root(environ=None, platform=None) -> Path
-```
+`default_tools()`, `prepare_tool()`, `refresh_tools()`, `uninstall_tool()` and
+`user_data_root()` are exported from `vesryn_tool_runtime`. Their signatures
+and types are in the {doc}`generated API reference <autoapi/index>`; this page
+keeps the behaviour, the failures and the ownership boundaries.
 
 ### The two local stores
 
@@ -186,27 +177,19 @@ See [Persist Installation Provenance](adr/persist-installation-provenance.md)
 for the architecture decision and [the Schema upgrade boundary](discovery-contracts.md#migration-boundary-explicit)
 for existing registration stores.
 
-## Public signatures
+## Public entry points
 
-All types/helpers below are exported from `vesryn_tool_runtime`:
+The Catalog asset helpers, `AssetSelection`, `asset_root()`,
+`native_asset_directory()` and `AssetIndex` are exported from
+`vesryn_tool_runtime`. Their signatures and types are in the
+{doc}`generated API reference <autoapi/index>`.
 
-```text
-Catalog.register_asset(definition: AssetDefinition, *, tools)
-Catalog.asset_for(tool_id, *, scope=None) -> AssetDefinition
-Catalog.select_asset(tool_id, *, target, policy, version=None,
-                     specifier="", scope=None) -> AssetSelection
-Catalog.asset_view(tool_id, *, target, policy, selection=None,
-                   index=None, scope=None) -> dict
-AssetSelection.document() -> dict
-AssetSelection.from_document(value) -> AssetSelection
-asset_root(path=None, *, environ=None, platform=None) -> Path
-native_asset_directory(root, selection) -> Path
-AssetIndex(root, *, timeout=10)
-AssetIndex.record(receipt: AssetReceipt) -> dict
-AssetIndex.installed(selection: AssetSelection) -> dict
-```
-
-Register the ToolSpec/adapter first. `register_asset` requires at least one existing tool ID, supports one definition associated with many tools, and rejects conflicting asset ownership atomically. Composition and scoped catalogs preserve associations and original Provider identities; they do not build a second Registry.
+`register_asset` associates one definition with at least one tool key and
+rejects conflicting ownership atomically. A ToolSpec or Adapter is not required
+to register the association or read it with `asset_for`. `select_asset` needs a
+registered ToolSpec and Provider identity to freeze the contract in a selection;
+invocation additionally needs an Adapter and explicit host Scope. Composition
+and scoped catalogs preserve associations and Provider identities.
 
 The selection contains tool ID/Provider/contract hash, asset ID, publication revision and definition hash, exact release, complete target, policy snapshot/revision and consumer version requirements. Its `selection_id` covers that full snapshot. Its `artifact_id` covers asset ID, release and target, allowing two consumers or policy revisions to share identical installed content. Neither ID grants permission.
 
@@ -223,17 +206,12 @@ Existing `resolve`, `page`, `search`, `documents` and asset discovery do not dow
 
 ## B/C backend receipt boundary
 
-```text
-AssetFile(path, sha256)
-AssetReceipt(selection, outcome: ToolResult, locator=None, files=(),
-             environment_id=None, verified_source_sha256=None)
-AssetReceipt.document() -> dict
-AssetReceipt.from_document(value) -> AssetReceipt
-```
+`AssetFile` and `AssetReceipt` carry the shared receipt boundary; their fields
+and signatures are in the {doc}`generated API reference <autoapi/index>`.
 
 B (uv) and C (aria2) produce the **same** receipt after their actual backend operation. They preserve the original `ToolResult` status and exit code. A successful delivery of JSON or a report is not installation success. Success needs `passed`, exit 0, `executed`, `complete`, `current`, an absolute locator, an entry-file manifest and the backend's verified source-artifact SHA matching the frozen definition. Python also needs an opaque full-SHA `environment_id` from the backend's actual uv environment identity. A manifest must include the declared CLI entry (including the Windows `.exe` entry variant where appropriate).
 
-The receipt boundary validates facts, not the truthfulness of a third-party backend. B/C must actually verify the archive/wheel before reporting `verified_source_sha256`, and must produce file hashes from its installed payload. This task performs no backend operation. It never invents a passed receipt. `ToolResult` retains its existing success/failure/uncertain semantics; no new backend-ready status is introduced.
+The receipt boundary validates facts, not the truthfulness of a third-party backend. B/C must actually verify the archive/wheel before reporting `verified_source_sha256`, and must produce file hashes from its installed payload. A passed receipt must reflect an actual backend outcome. `ToolResult` retains its existing success/failure/uncertain semantics; no new backend-ready status is introduced.
 
 The persisted form allowlists status, exit code and execution/completeness/current facts. It excludes backend outputs, parameters, stdout and raw diagnostics. `failed/17` remains `failed/17`. A failed attempt updates `last_receipt` but preserves an older verified installation of that same artifact; the failed attempt remains visible independently. Missing facts cannot create an installed entry. With no verified installation, unknown/unavailable/interrupted/incomplete backend outcomes remain `unknown/backend_unknown`, distinct from an indexed local miss. Backends retain the existing EventSink observation boundary where applicable; the local receipt/index is not a replacement logging system.
 
