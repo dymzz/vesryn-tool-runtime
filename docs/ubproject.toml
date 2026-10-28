@@ -1,0 +1,34 @@
+# CodeLinks source tracing for the Tool Runtime package.
+#
+# Read by sphinx-codelinks from next to conf.py (docs/conf.py). The file is
+# the shared ubCode project file; only the [codelinks] section below is this
+# repository's configuration. Relative paths are resolved against this file's
+# directory, so the source root is the package directory one level up.
+"$schema" = "https://ubcode.useblocks.com/ubproject.schema.json"
+
+[codelinks]
+# The remote URL is the trace the documentation cites: it names the commit
+# the build was made from, never a moving branch.
+set_remote_url = true
+
+[codelinks.projects.tool_runtime]
+remote_url_pattern = "https://github.com/dymzz/vesryn-tool-runtime/blob/{commit}/{path}#L{line}"
+# The field the references are attached to. It is a list of URLs, one per
+# reference, in source order.
+ref_url_field = "code_url"
+
+[codelinks.projects.tool_runtime.source_discover]
+# Only the package's own source is scanned.
+src_dir = "../src/vesryn_tool_runtime"
+include = ["**/*.py"]
+comment_type = "python"
+gitignore = true
+
+[codelinks.projects.tool_runtime.analyse]
+# Existing Needs are referenced, never created from the source.
+get_need_id_refs = true
+get_oneline_needs = false
+get_multiline_needs = false
+
+[codelinks.projects.tool_runtime.analyse.need_id_refs]
+markers = ["@need-ids:"]

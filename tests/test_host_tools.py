@@ -305,7 +305,11 @@ def test_a_compiled_wheel_names_a_gil_enabled_interpreter(env, monkeypatch):
     monkeypatch.setattr(
         host_tools, "_interpreter_facts", lambda executable: facts.get(str(executable))
     )
-    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [str(other)])
+    monkeypatch.setattr(
+        host_tools,
+        "_uv_interpreters",
+        lambda uv, environ, version, runner: [str(other)],
+    )
 
     # A compiled wheel (a platform-specific one) needs the GIL-enabled build.
     assert host_tools._tool_interpreter(
@@ -318,6 +322,58 @@ def test_a_compiled_wheel_names_a_gil_enabled_interpreter(env, monkeypatch):
     )
 
 
+def test_a_plugin_set_names_a_gil_enabled_interpreter(env, monkeypatch):
+    """A plugin set lands in the same environment and must load there too.
+
+    Published plugin wheels are commonly GIL-bound — a cpXY build or the
+    stable ABI — and a free-threaded interpreter cannot load them: the
+    backend would have to build the plugin from source instead.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    other = env["bin"] / "python.exe"
+    other.write_bytes(b"interpreter")
+
+    facts = {
+        sys.executable: (3, 14, False),
+        str(other): (3, 14, True),
+    }
+    monkeypatch.setattr(
+        host_tools, "_interpreter_facts", lambda executable: facts.get(str(executable))
+    )
+    monkeypatch.setattr(
+        host_tools,
+        "_uv_interpreters",
+        lambda uv, environ, version, runner: [str(other)],
+    )
+
+    # A pure-python wheel WITH a plugin set: the plugin's own artifacts have
+    # to load in that environment, so the GIL-enabled build is named.
+    assert host_tools._tool_interpreter(
+        "sphinx-9.2.0-py3-none-any.whl",
+        env["environ"],
+        ("sphinx-codelinks==2.0.1",),
+    ) == str(other)
+    # Without a plugin set the running interpreter is kept.
+    assert (
+        host_tools._tool_interpreter("sphinx-9.2.0-py3-none-any.whl", env["environ"])
+        == sys.executable
+    )
+    # A host without a GIL-enabled interpreter keeps the running one: the
+    # plugin set may be pure Python, and that is not refused over.
+    monkeypatch.setattr(
+        host_tools, "_uv_interpreters", lambda uv, environ, version, runner: []
+    )
+    assert (
+        host_tools._tool_interpreter(
+            "sphinx-9.2.0-py3-none-any.whl",
+            env["environ"],
+            ("sphinx-codelinks==2.0.1",),
+        )
+        == sys.executable
+    )
+
+
 def test_no_interpreter_that_can_load_the_wheel_is_a_stable_reason(env, monkeypatch):
     """A host without a GIL-enabled interpreter reports a stable reason."""
     from vesryn_tool_runtime import host_tools
@@ -325,13 +381,62 @@ def test_no_interpreter_that_can_load_the_wheel_is_a_stable_reason(env, monkeypa
     monkeypatch.setattr(
         host_tools, "_interpreter_facts", lambda executable: (3, 14, False)
     )
-    monkeypatch.setattr(host_tools, "_path_interpreters", lambda environ: [])
+    monkeypatch.setattr(
+        host_tools, "_uv_interpreters", lambda uv, environ, version, runner: []
+    )
     assert (
         host_tools._tool_interpreter(
             "deptry-0.25.1-cp310-abi3-win_amd64.whl", env["environ"]
         )
         is None
     )
+
+
+def test_the_gil_interpreters_come_from_uv_own_listing(env):
+    """uv's list tells the builds apart, and names the ones it manages.
+
+    uv's own listing says which build an entry is — the free-threaded one
+    cannot load a GIL-bound wheel — and it lists the interpreters uv
+    manages, which are not on the target PATH at all. An entry uv could
+    only download is not an interpreter yet.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    def entry(version, variant, path, implementation="cpython"):
+        marker = "" if variant == "default" else f"+{variant}"
+        return {
+            "key": f"cpython-{version}{marker}-windows-x86_64-none",
+            "version": version,
+            "variant": variant,
+            "implementation": implementation,
+            "path": path,
+        }
+
+    # The fixture names each interpreter once; the expectation is read back
+    # from it, so a changed fixture needs no new literal here.
+    ordinary = entry("3.14.3", "default", "ordinary")
+    managed = entry("3.14.3", "default", "managed")
+    freethreaded = entry("3.14.8", "freethreaded", "freethreaded")
+    other_version = entry("3.13.5", "default", "other-version")
+    downloadable = entry("3.15.0", "default", None)
+    listing = json.dumps([ordinary, managed, freethreaded, other_version, downloadable])
+    calls = []
+
+    def listing_uv(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, listing, "")
+
+    assert host_tools._uv_interpreters("uv", env["environ"], "3.14", listing_uv) == [
+        ordinary["path"],
+        managed["path"],
+    ]
+    assert calls == [["uv", "python", "list", "--output-format", "json"]]
+
+    # A listing uv cannot read leaves the caller with no candidate.
+    def failing_uv(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 1, "", "no")
+
+    assert host_tools._uv_interpreters("uv", env["environ"], "3.14", failing_uv) == []
 
 
 def test_the_selected_artifact_is_digest_checked_before_the_install(

@@ -14,6 +14,13 @@ batches and original outcomes. Only explicit host scope admits execution.
 Use vesryn-log's public EventSink protocol, allowlist safe event fields, and report
 recording failures independently. Never log parameters or raw adapter diagnostics.
 
+## Code Comments & Docstrings
+
+- **Public APIs**: Document exported behavioral contracts with concise docstrings. Explain relevant preconditions, side effects, errors, and resource ownership; avoid duplicating type signatures or existing specifications.
+- **Inline Comments (`#`)**: Write only when intent, reasoning, or constraints are not evident from names, types, or code structure. Prioritize *why*, *trade-offs*, and *invariants* over narrating *what*.
+- **Valid Cases**: Complex algorithms/formulas (including meaning, units, or references), non-obvious state transitions, concurrency/transaction ordering, resource lifecycles, subtle edge cases, security boundaries, compatibility workarounds (with removal conditions when known), and unusual optimizations.
+- **Prohibitions**: Do not narrate obvious code, echo task prompts or change history, retain commented-out dead code, or add broad lint/type suppressions without a specific rule and nearby justification.
+- **Traceability**: Preserve valid structured markers such as `@need-ids:`. When refactoring, update their locations or references to match the actual implementation; never silently remove or leave stale links.
 
 ## Architecture Documentation
 
