@@ -126,6 +126,24 @@ git merge-base --is-ancestor $baseSha $targetSha
 if ($LASTEXITCODE -ne 0 -or $baseSha -eq $targetSha) {
     throw 'The base must be an ancestor of a distinct target commit.'
 }
+# The projection reads the FIRST-PARENT chain of the range. That chain is
+# main's history only when the target actually landed there, so the fact is
+# checked here instead of being assumed.
+$mainRefs = @(git for-each-ref --format='%(refname)' refs/heads/main refs/remotes/origin/main)
+if ($mainRefs.Count -eq 0) {
+    throw 'No main branch reference is available to verify the target commit.'
+}
+$onMain = $false
+foreach ($ref in $mainRefs) {
+    git merge-base --is-ancestor $targetSha $ref
+    if ($LASTEXITCODE -eq 0) {
+        $onMain = $true
+        break
+    }
+}
+if (-not $onMain) {
+    throw "The target commit is not in the main branch history: $targetSha"
+}
 $range = "$baseSha..$targetSha"
 $firstParents = @(git rev-list --first-parent $range)
 if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate first-parent commits.' }
