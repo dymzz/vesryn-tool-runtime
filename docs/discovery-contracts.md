@@ -93,6 +93,11 @@ provider 描述资产来源,method 描述调用入口:由 uv 准备的 CLI 可�
 - `DiscoveryQuery` / `DiscoveryPage`: 分页与过滤沿用既有界(limit 默认 10,范围 1–50);页内条目就是三类记录的文档;诊断与查询错误独立于 ToolResult 业务状态。
 - `open_record_store(path)`: 路径必填(`":memory:"` 或调用者显式选择的文件位置)——不存在从安装目录推导的默认可写位置;冻结 DDL 与种子作为**包资源**交付(`record_schema.sql`、`record_seed.sql`,经 `importlib.resources` 读取),独立安装即可用;仓库演示库在 `data/records.sqlite3`。
 
+`DiscoveryQuery` 和 `DiscoveryPage` 定义数据契约，不代表已实现分组成员的
+排序检索或入口到执行对象的解析。`ComposedCatalog` 提供记录查找和按主键排序的
+遍历；它不会把 `ToolAccess` 自动接入 Binding 或 Adapter。已有的 `Catalog.search`
+和 `Catalog.page` 操作的是已登记的 ToolSpec，而非这些记录的查询服务。
+
 ### Live Record Registration and Composition
 
 ```python
@@ -110,6 +115,7 @@ store.put_records(bundled_records())
 
 # 3. Explicit read-only Catalog composition
 catalog = compose_catalog(store)
+store.close()
 ```
 
 ## Migration boundary (explicit)

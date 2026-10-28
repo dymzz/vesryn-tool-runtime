@@ -31,7 +31,10 @@ Catalogs represent explicit collections of tool specifications and adapters. Dup
 - **Binding Functions**: `create_binding()`, `verify_binding()`, `canonical_binding()`, `verify_document()`.
 - **Constants**: `SELECTION_BINDING` (Schema 1 identifier).
 
-Selection bindings freeze the exact contract hash, tool version, provider identity, parameter constraints, and scope permissions into an immutable, verifiable document.
+Selection bindings freeze the contract hash and contract version, Provider
+identity, selected parameters and scope in a verifiable document. The contract
+version is not the version of an installed CLI; a binding does not grant
+execution permission.
 
 ### 1.4 Discovery Records & Store
 - **Record Types**: `ToolAsset`, `ToolGroup`, `ToolAccess`, `GroupMember`, `Platform`, `ToolAssetVersion`.
@@ -40,7 +43,10 @@ Selection bindings freeze the exact contract hash, tool version, provider identi
 - **Query & Pagination**: `DiscoveryQuery`, `DiscoveryPage`, `DiscoveryDiagnostic`, `DiscoveryErrorDocument`.
 - **Exceptions**: `RecordError`, `DiscoveryContractError`.
 
-Provides a normalized six-table SQLite backing store for tool assets, releases, groups, and access entry points with progressive disclosure contracts.
+Provides a normalized six-table SQLite backing store for tool assets, releases,
+groups and access records. The query and page types describe documents; the
+record catalog does not implement ranked group search or turn access records
+into executable Adapters.
 
 ### 1.5 Asset Contracts & Backends
 - **Asset Definitions & Policy**: `AssetDefinition`, `AssetRelease`, `AssetTarget`, `AssetSelection`, `AssetPolicy`.
@@ -67,7 +73,8 @@ Read-only adapter translating live record assets into legacy preparation structu
 
 1. **Deterministic Bounded Documents**:
    - JSON serialization adheres to strict bounds (default 2 MiB) with rejection of duplicate keys and NaN/Infinity values.
-   - File writes are atomic or exclusive (`filelock`).
+   - Document creation is exclusive and replacement is atomic; the asset index
+     uses a separate cross-process `filelock` for coordinated updates.
 
 2. **Admission and Scope Gates**:
    - Tool discovery filtering precedes ranking and pagination.
@@ -150,6 +157,7 @@ store.put_records(bundled_records())
 
 # Read-only composed catalog for discovery and resolution
 catalog = compose_catalog(store)
+store.close()
 tool = catalog.asset("ripgrep")
 ```
 

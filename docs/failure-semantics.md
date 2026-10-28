@@ -45,6 +45,9 @@ unavailable without execution so the host owns any continuation/recovery decisio
 Parameters, credentials, raw outputs, summaries, reasons and SDK exceptions are
 excluded. Invoking/returned share invocation and batch identities.
 The normative JSON Schema is `vesryn_tool_runtime.schemas.TOOL_EVENT`.
+It does not provide `access_id`, separate event IDs, explicit parent invocation
+IDs or raw input/output evidence handoff. A ToolAccess record therefore does not
+by itself establish those invocation or observation facts.
 
 Sink exceptions become safe `observation_errors`; they do not change tool status,
 exit code or output. A caller requiring observation must configure a sink and

@@ -9,10 +9,15 @@ evaluation tools (including their explicit Dagger transport), and `unified` for
 shared CLI profiles. `Catalog.provider_for(tool_id)` supplies the identity when
 freezing a Binding from that same explicitly assembled Catalog.
 
-Tool discovery is bounded, deterministic and progressively discloses purpose
-summaries before full contracts. Scope filtering precedes ranking and pagination.
-Selection never activates capabilities or grants permissions. A mutable host
-constraint is reevaluated at dispatch. The host supplies available dependencies.
+`Catalog.search` and `Catalog.page` operate on registered ToolSpecs, with bounded,
+deterministic results and scope filtering before ranking or pagination. Page
+summaries precede opt-in full contracts. Selection never grants permissions; a
+mutable host constraint is reevaluated at dispatch.
+
+`ComposedCatalog` exposes ordered record traversal and lookup. It does not
+implement ranked group/member discovery or turn a `ToolAccess` record into an
+executable Adapter or Binding. The host explicitly supplies an Adapter, scope and
+available dependencies for invocation.
 
 Dagger TypeDef mapping is optional in `dagger_discovery`. Remote modules require
 explicit immutable source identity and an exposure allowlist; unsupported or

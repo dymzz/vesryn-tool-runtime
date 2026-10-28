@@ -5,6 +5,10 @@ discovery, Selection Binding Schema 1, admission and batch invocation. Python 3.
 
 `Registration → Discovery → Binding → Invocation → Execution → Validation → Observation`
 
+This chain describes the Python tool path; Binding and observation are optional.
+Host CLI preparation publishes a command list for direct shell use without a
+Binding or ToolAdapter; the host makes the entry available on PATH.
+
 Start with [the documentation index](docs/README.md), including the runnable
 [quickstart](docs/quickstart.md), [public API](docs/python-api.md),
 [discovery field contracts](docs/discovery-contracts.md) and
