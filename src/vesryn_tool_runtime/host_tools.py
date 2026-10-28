@@ -240,6 +240,32 @@ def _matched_version(reported, candidates):
     return None
 
 
+def _uv_entry_version(uv, asset, environ, runner, entry, version):
+    """The version of a uv tool entry that prints no version line of its own.
+
+    uv states the version of the environment it manages and the entries it
+    exposes, so a CLI without a ``--version`` line is still verifiable. The
+    version is accepted only when the resolved entry IS that environment's own
+    entry and it names the selected release: an entry of another installation
+    stays the honest conflict it was before.
+    """
+    if asset.provider != "uv":
+        return None
+    try:
+        observed = _inspect_packages(uv, asset, environ, runner)
+    except HostToolError:
+        return None
+    if observed is None:
+        return None
+    if not any(_same_entry(entry, path) for path in observed["entrypoints"]):
+        return None
+    reported = observed["version"]
+    if version is None:
+        declared = {item.version for item in asset.versions}
+        return reported if reported in declared else None
+    return version if _version_matches({reported}, version) else None
+
+
 def _find_release(asset, version, platform=None):
     host = sys_platform(platform)
     import platform as _platform
@@ -353,31 +379,36 @@ def prepare_tool(
     if entry is not None:
         if not probed:
             # The probe FAILED: its output is not evidence that the entry
-            # works, so nothing is registered for it.
-            return _outcome(
-                "conflict",
-                tool_id,
-                command,
-                version,
-                entry,
-                detail=probe_detail,
-            )
-        reported = _reported_versions(shown)
-        if version is None:
-            # No explicit selection: any declared release the entry reports
-            # is a legitimate reuse, reported with the version it shows.
-            matched = _matched_version(reported, sorted(declared_versions))
+            # works. A uv tool states its version in uv's own listing
+            # rather than on a version line, so that is read next -- and
+            # only for the entry uv itself owns.
+            matched = _uv_entry_version(uv, asset, environ, runner, entry, version)
+            if matched is None:
+                return _outcome(
+                    "conflict",
+                    tool_id,
+                    command,
+                    version,
+                    entry,
+                    detail=probe_detail,
+                )
         else:
-            matched = version if _version_matches(reported, version) else None
-        if matched is None:
-            return _outcome(
-                "conflict",
-                tool_id,
-                command,
-                version,
-                entry,
-                detail=f"existing entry reports: {(shown or '')[:120]}",
-            )
+            reported = _reported_versions(shown)
+            if version is None:
+                # No explicit selection: any declared release the entry reports
+                # is a legitimate reuse, reported with the version it shows.
+                matched = _matched_version(reported, sorted(declared_versions))
+            else:
+                matched = version if _version_matches(reported, version) else None
+            if matched is None:
+                return _outcome(
+                    "conflict",
+                    tool_id,
+                    command,
+                    version,
+                    entry,
+                    detail=f"existing entry reports: {(shown or '')[:120]}",
+                )
         # Keep the recorded installation owner and its actual artifact proof.
         # The current declaration is compared with that proof below; a cache
         # hit or successful version probe never creates source evidence.
