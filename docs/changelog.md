@@ -2,8 +2,12 @@
 
 This file records released versions, migration boundaries and references to
 release evidence. Artifact digests remain with their versioned release records.
-Release notes projected from commit history belong to the separate P5 delivery
-switch; this file is not a substitute for that mechanism.
+
+The release notes of a version after v0.4.0 are projected from the final Git
+history by the checked-in git-cliff configuration; see
+[release note candidates](delivery/release-notes.md). They are not written
+here by hand, and this file is not extended with a parallel summary of the
+same changes.
 
 ## 0.1.0 — extraction candidate
 

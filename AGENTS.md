@@ -42,3 +42,11 @@ for the task; they are not automatically current repo contracts.
   [Release Readiness](docs/delivery/release-readiness.md)
   and verify the applicable acceptance criteria.
   Readiness assessment does not authorize publication.
+- The release notes of a version after v0.4.0 are projected from the final
+  Git history by the checked-in git-cliff configuration; see
+  [Release note candidates](docs/delivery/release-notes.md). A confirmed
+  user-facing impact is a `Release-Note:` footer on the commit that actually
+  reaches main, and a breaking change uses the native Conventional Commit `!`
+  or `BREAKING CHANGE:`. The historical entries in
+  [the changelog](docs/changelog.md) stay as they are and are not extended
+  with a parallel summary of the same changes.
