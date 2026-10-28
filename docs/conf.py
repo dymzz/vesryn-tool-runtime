@@ -14,7 +14,7 @@ project = _project["name"]
 release = _project["version"]
 version = release
 
-extensions = ["myst_parser", "sphinx_needs", "sphinx_codelinks"]
+extensions = ["myst_parser", "sphinx_needs", "sphinx_codelinks", "sphinx_test_reports"]
 source_suffix = {".md": "markdown"}
 root_doc = "README"
 exclude_patterns = ["superpowers/**"]
@@ -26,6 +26,17 @@ needs_id_required = True
 needs_build_json = True
 needs_reproducible_json = True
 needs_schema_validation_enabled = True
+# A test case names the specification it verifies. The link type is declared
+# here because the test cases are imported, not authored: the conversion maps
+# the JUnit property onto this field (see ubproject.toml).
+needs_links = {
+    "verifies": {
+        "incoming": "is verified by",
+        "outgoing": "verifies",
+        "target_types": ["spec"],
+        "allow_dead_links": False,
+    },
+}
 needs_types = [
     {
         "directive": "spec",

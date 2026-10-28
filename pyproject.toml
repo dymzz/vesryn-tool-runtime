@@ -22,13 +22,25 @@ source-include = ["docs/**", "examples/**", "api/dagger.json", "api/pyproject.to
 vesryn-log = { git = "https://github.com/dymzz/vesryn-log.git", rev = "030c5a8edf820588e29f53803b6baaf53b1f6e57" }
 
 [dependency-groups]
-dev = ["pytest==9.0.3", "ruff==0.16.10"]
+dev = ["pytest==9.0.3", "ruff==0.16.10", "ub-test-reports[pytest]==1.1.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 cache_dir = ".cache/pytest"
+# The test-report plugin writes each case's source location and the
+# properties a test declares, so the JUnit XML carries the trace.
+addopts = "-p ub_test_reports.pytest_plugin"
+junit_family = "xunit1"
+# The property a test declares, and the XML name it is written under.
+test_reports_properties = ["verifies = Verifies, list"]
 
 [tool.ruff]
 target-version = "py314"
 extend-exclude = [".dagger"]
+
+[tool.ruff.lint]
+extend-select = ["PGH003", "PGH004", "RUF100"]
+
+[tool.pyright]
+reportUnnecessaryTypeIgnoreComment = "warning"

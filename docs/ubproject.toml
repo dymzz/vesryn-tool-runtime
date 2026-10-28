@@ -1,9 +1,11 @@
-# CodeLinks source tracing for the Tool Runtime package.
+# CodeLinks source tracing for the Tool Runtime package, and the test-report
+# conversion, for the same manual.
 #
-# Read by sphinx-codelinks from next to conf.py (docs/conf.py). The file is
-# the shared ubCode project file; only the [codelinks] section below is this
-# repository's configuration. Relative paths are resolved against this file's
-# directory, so the source root is the package directory one level up.
+# Read by sphinx-codelinks and sphinx-test-reports from next to conf.py
+# (docs/conf.py). The file is the shared ubCode project file; only the
+# sections below are this repository's configuration. Relative paths are
+# resolved against this file's directory, so the source root is the package
+# directory one level up.
 "$schema" = "https://ubcode.useblocks.com/ubproject.schema.json"
 
 [codelinks]
@@ -32,3 +34,19 @@ get_multiline_needs = false
 
 [codelinks.projects.tool_runtime.analyse.need_id_refs]
 markers = ["@need-ids:"]
+
+# The test-report conversion. The `build needs` command of ub-test-reports
+# reads this table; the build imports what the command wrote, so the property
+# mapping is declared once and nowhere else. A `--link-property` flag would
+# replace the whole table, so the command line must not carry one.
+[test_reports.build.needs]
+# The JUnit property a test declares, mapped to the link field the need
+# carries. The property name is the one the pytest plugin writes.
+link_properties = { Verifies = "verifies" }
+# The need type of a test case; it must agree with the build's `case` type.
+need_type = "testcase"
+project = "vesryn-tool-runtime"
+version = "0.3.1"
+# The source address of a test case. The commit is given per invocation.
+remote_url = "https://github.com/dymzz/vesryn-tool-runtime"
+url_pattern = "{base}/blob/{commit}/{file}#L{line}"
