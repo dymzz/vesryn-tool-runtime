@@ -50,6 +50,9 @@ is the historical authority for its notes, artifacts and attached provenance.
 Its annotated tag resolves to `0384f4a2f2278a130a1a95efd9f714caf9f77a74`;
 the provenance identifies the same source and
 [CI run 40687914023](https://github.com/dymzz/vesryn-tool-runtime/actions/runs/40687914023).
+That tagged source was merged as a second parent; it is not an entry on main's
+first-parent chain. Replaying that historical source range is different from
+selecting a future release target on main.
 The existing [changelog](../changelog.md) preserves historical migration and
 compatibility facts that cannot be reconstructed from commit messages.
 
@@ -77,11 +80,16 @@ release.
 ## Generate for a fixed range
 
 Run these PowerShell commands from the repository root. This example projects
-the historical range for inspection only; it does not replace its release
-notes. For a future candidate, provide the previous release tag and its known
-commit, a **full fixed target commit SHA**, and the proposed version. The target
+the already merged `3409f8b` commit with an illustrative `v0.4.1` label for
+inspection; it does not assert that the package version or release readiness
+matches that label. For a future candidate, provide the previous release tag
+and its known commit, a **full fixed target commit SHA**, and the proposed version. The target
 must be the actual accepted main-branch commit before publication. Do not use
 `HEAD`, a moving branch name, or a candidate branch commit as proof of delivery.
+Refresh `origin/main` before selecting a future target and retain the resolved
+main snapshot with the delivery evidence. The offline check below prefers that
+remote-tracking reference over a potentially diverged local main branch; the
+publisher still owns the final check against the live main head.
 
 The script uses Git to select first-parent SHAs and git-cliff's native
 `--skip-commit` to omit the other commits. It does not parse commit messages or
@@ -92,10 +100,10 @@ backup tags, from splitting this explicitly selected range. The supplied version
 labels the single candidate.
 
 ```powershell
-$baseTag = 'v0.3.1'
-$baseSha = 'adc11947632a284a43296092d8f7a41acd2953c3'
-$targetSha = '0384f4a2f2278a130a1a95efd9f714caf9f77a74'
-$version = 'v0.4.0'
+$baseTag = 'v0.4.0'
+$baseSha = '0384f4a2f2278a130a1a95efd9f714caf9f77a74'
+$targetSha = '3409f8baa89a8e936b174acb5d47d659bb415b92'
+$version = 'v0.4.1'
 # Full first-parent SHAs withdrawn or superseded after review of the target tree.
 $omitted = @()
 
@@ -126,23 +134,23 @@ git merge-base --is-ancestor $baseSha $targetSha
 if ($LASTEXITCODE -ne 0 -or $baseSha -eq $targetSha) {
     throw 'The base must be an ancestor of a distinct target commit.'
 }
-# The projection reads the FIRST-PARENT chain of the range. That chain is
-# main's history only when the target actually landed there, so the fact is
-# checked here instead of being assumed.
-$mainRefs = @(git for-each-ref --format='%(refname)' refs/heads/main refs/remotes/origin/main)
-if ($mainRefs.Count -eq 0) {
+# Reachability also admits intermediate side-branch commits. The target must
+# be on main's first-parent chain so its own chain is the delivery history.
+$mainRef = 'refs/remotes/origin/main'
+git show-ref --verify --quiet $mainRef
+if ($LASTEXITCODE -eq 1) {
+    $mainRef = 'refs/heads/main'
+} elseif ($LASTEXITCODE -ne 0) {
+    throw 'Could not check the main branch reference.'
+}
+$mainSnapshot = git rev-parse --verify --quiet "${mainRef}^{commit}"
+if ($LASTEXITCODE -ne 0) {
     throw 'No main branch reference is available to verify the target commit.'
 }
-$onMain = $false
-foreach ($ref in $mainRefs) {
-    git merge-base --is-ancestor $targetSha $ref
-    if ($LASTEXITCODE -eq 0) {
-        $onMain = $true
-        break
-    }
-}
-if (-not $onMain) {
-    throw "The target commit is not in the main branch history: $targetSha"
+$mainFirstParents = @(git rev-list --first-parent $mainSnapshot)
+if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate main first-parent commits.' }
+if ($targetSha -notin $mainFirstParents) {
+    throw "The target commit is not on the main first-parent chain: $targetSha"
 }
 $range = "$baseSha..$targetSha"
 $firstParents = @(git rev-list --first-parent $range)
@@ -183,6 +191,40 @@ See git-cliff's [command options](https://git-cliff.org/docs/usage/args/) and
 [template context](https://git-cliff.org/docs/templating/context/) for its
 native range, footer and breaking-change behavior.
 
+### Replay the historical source range
+
+The pre-P5 v0.4.0 tag identifies a merged branch source. Keep its original
+`v0.3.1..v0.4.0` range for a retrospective parser exercise, rather than
+weakening the future-target check above. After preparing the pinned runner as
+above, run this separate read-only replay from the repository root:
+
+```powershell
+$historyBase = git rev-parse --verify --quiet 'refs/tags/v0.3.1^{commit}'
+if ($LASTEXITCODE -ne 0 -or $historyBase -ne 'adc11947632a284a43296092d8f7a41acd2953c3') {
+    throw 'Historical v0.3.1 tag is missing or has a different target.'
+}
+$historyTarget = git rev-parse --verify --quiet 'refs/tags/v0.4.0^{commit}'
+if ($LASTEXITCODE -ne 0 -or $historyTarget -ne '0384f4a2f2278a130a1a95efd9f714caf9f77a74') {
+    throw 'Historical v0.4.0 tag is missing or has a different target.'
+}
+$historyRange = "$historyBase..$historyTarget"
+$historyFirstParents = @(git rev-list --first-parent $historyRange)
+if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate the historical source chain.' }
+$historyAll = @(git rev-list $historyRange)
+if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate the historical range.' }
+$historySkipArgs = @()
+foreach ($sha in $historyAll) {
+    if ($sha -notin $historyFirstParents) { $historySkipArgs += '--skip-commit', $sha }
+}
+uvx --from git-cliff==2.14.2 git-cliff --config cliff.toml --offline --no-exec `
+    --tag v0.4.0 @historySkipArgs --output .tmp/issue60/historical-release-notes.md -- $historyRange
+if ($LASTEXITCODE -ne 0) { throw 'Historical git-cliff replay failed.' }
+```
+
+This range has no usable first-parent release-note or breaking-change footers,
+so its candidate sections are empty. The existing changelog, published notes
+and provenance retain the migration and compatibility facts.
+
 ## Consume the candidate at the release entry
 
 The generated file is the publisher's input in `gh`'s own shape: both
@@ -191,6 +233,12 @@ The generated file is the publisher's input in `gh`'s own shape: both
 delivers its git-cliff configuration and this output contract, and nothing
 more: it creates no publisher, no tag manager, no manifest and no release
 state machine, and it does not embed the engineering-ci release workflow.
+
+A non-publishing notes-input rehearsal can run the real `gh` commands against
+a local API fixture and compare the submitted `body` and readback with the
+generated UTF-8 file. `--draft` still writes a GitHub Draft and can create a
+tag, so it is not a no-write mode. A local rehearsal proves file consumption;
+it does not exercise live publication permissions or the publisher's gates.
 
 The publisher keeps everything it already owns — the version and SHA checks,
 the [Release Readiness](release-readiness.md) C1–C8 assessment, the formal CI
