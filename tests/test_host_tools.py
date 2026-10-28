@@ -653,6 +653,103 @@ def test_a_failed_version_probe_is_not_a_reuse(env):
     assert not tools_json(env["root"]).exists()
 
 
+def test_a_first_install_registers_a_cli_without_a_version_line(env, monkeypatch):
+    """A CLI whose argparse rejects --version must still be registered.
+
+    The installation produced the entry, and uv states the version of the
+    environment that owns it: the preparation and the registration finish in
+    one call, without a version line of the tool's own.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    asset, _release, stored = _synthetic_declaration(env)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
+    monkeypatch.setattr(
+        host_tools,
+        "_verified_artifact",
+        lambda asset, release, **kwargs: _store_artifact(stored),
+    )
+    name = "vulture.bat" if (sys.platform).startswith("win") else "vulture"
+    entry = env["bin"] / name
+
+    def installing_uv(argv, **kwargs):
+        if isinstance(argv, list) and "tool" in argv:
+            # The install makes the command resolvable; the CLI rejects the
+            # version option the way argparse does.
+            if (sys.platform).startswith("win"):
+                entry.write_text("@echo vulture\n@exit /b 2\n", encoding="utf-8")
+            else:
+                entry.write_text("#!/bin/sh\nexit 2\n", encoding="utf-8")
+                entry.chmod(0o755)
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        return run_real(argv, **kwargs)
+
+    monkeypatch.setattr(
+        host_tools,
+        "_inspect_packages",
+        lambda uv, asset, environ, runner: {
+            "package": "vulture",
+            "version": "2.16",
+            "entrypoints": (str(entry),),
+            "environment": {},
+        },
+    )
+
+    outcome = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=installing_uv,
+    )
+    assert outcome["status"] == "installed"
+    assert read_json(tools_json(env["root"])) == [
+        {"command": "vulture", "description": "检测 Python 无用代码"}
+    ]
+
+
+def test_a_launch_failure_is_not_papered_over_by_the_version_fallback(env, monkeypatch):
+    """An entry that cannot start is a failure, not a version fact.
+
+    The uv environment may match the entry exactly; that still does not make
+    an entry that refuses to start usable, so the failure is kept.
+    """
+    from vesryn_tool_runtime import host_tools
+
+    asset, _release, _stored = _synthetic_declaration(env)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
+    entry = make_command(env["bin"], "vulture", "vulture 2.16")
+
+    def failing_launch(argv, **kwargs):
+        raise OSError("the entry cannot start")
+
+    monkeypatch.setattr(
+        host_tools,
+        "_inspect_packages",
+        lambda uv, asset, environ, runner: {
+            "package": "vulture",
+            "version": "2.16",
+            "entrypoints": (str(entry),),
+            "environment": {},
+        },
+    )
+
+    outcome = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=failing_launch,
+    )
+    assert outcome["status"] == "conflict"
+    assert "could not run" in outcome["detail"]
+    # The uv listing matches the environment, and it does not rescue an
+    # entry that cannot start.
+    assert not tools_json(env["root"]).exists()
+
+
 def test_preparing_twice_keeps_the_installation_owner(env, monkeypatch):
     """A re-preparation must not drop the runtime's installation ownership."""
     from vesryn_tool_runtime import host_tools
@@ -1359,11 +1456,11 @@ def test_probe_reads_an_entry_in_a_path_with_spaces(tmp_path):
     binroot = tmp_path / "bin with spaces"
     binroot.mkdir()
     make_command(binroot, "vulture", "vulture 2.16")
-    entry, shown, probed, _detail = host_tools._probe(
+    entry, shown, status, _detail = host_tools._probe(
         "vulture", {"PATH": str(binroot)}, run_real
     )
     assert entry is not None
-    assert probed is True
+    assert status == "ok"
     assert "2.16" in (shown or "")
 
 
