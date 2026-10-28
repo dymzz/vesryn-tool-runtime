@@ -15,5 +15,9 @@ result of a case — passed, failed, errored or skipped — is the one the repor
 recorded; a link says which contract a test points at, never that the
 contract holds.
 
+Only cases declaring a `verifies` relationship are imported here. The original
+report and converted JSON retain all cases and their results.
+
 ```{needimport} ../.tmp/test-needs.json
+:filter: verifies
 ```
