@@ -102,8 +102,8 @@ from vesryn_tool_runtime import (
     open_record_store,
 )
 
-# 1. Open persistent or in-memory store
-store = open_record_store(path)
+# 1. Open the in-memory store (a persistent path is the caller's own choice)
+store = open_record_store(":memory:")
 
 # 2. Register bundled records atomically (idempotent / conflict detection)
 store.put_records(bundled_records())

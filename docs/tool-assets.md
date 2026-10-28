@@ -55,7 +55,7 @@ The host tools module (`host_tools.py`) manages local tool preparation, registra
 
 Exported from `vesryn_tool_runtime`:
 
-```python
+```text
 default_tools() -> tuple[dict, ...]
 prepare_tool(tool_id, *, version=None, command=None, description=None,
              root=None, allow_network=False, platform=None, uv="uv",
@@ -106,7 +106,7 @@ manage plugins. Explicit `()` asks uv to reconcile an empty additional-request
 set; it is distinct from leaving plugin configuration alone. A package that is
 still needed transitively can remain in the environment.
 
-```python
+```python .skip
 from vesryn_tool_runtime import prepare_tool
 
 receipt = prepare_tool(
@@ -183,7 +183,7 @@ for existing registration stores.
 
 All types/helpers below are exported from `vesryn_tool_runtime`:
 
-```python
+```text
 Catalog.register_asset(definition: AssetDefinition, *, tools)
 Catalog.asset_for(tool_id, *, scope=None) -> AssetDefinition
 Catalog.select_asset(tool_id, *, target, policy, version=None,
@@ -216,7 +216,7 @@ Existing `resolve`, `page`, `search`, `documents` and asset discovery do not dow
 
 ## B/C backend receipt boundary
 
-```python
+```text
 AssetFile(path, sha256)
 AssetReceipt(selection, outcome: ToolResult, locator=None, files=(),
              environment_id=None, verified_source_sha256=None)

@@ -15,7 +15,7 @@ versions is not established by this release's evidence.
 
 Exported from `vesryn_tool_runtime`:
 
-```python
+```text
 UvToolBackend(index: AssetIndex, *, uv="uv", find_links=(), index_url=None,
               timeout=900, runner=subprocess.run)
 UvToolBackend.uv_version() -> str

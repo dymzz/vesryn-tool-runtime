@@ -104,31 +104,37 @@ from vesryn_tool_runtime import (
 
 class EchoAdapter(ToolAdapter):
     def invoke(self, calls, context):
-        results = []
-        for call in calls:
-            msg = call.inputs.get("message", "")
-            results.append(
-                ToolResult(status="passed", exit_code=0, outputs={"echo": msg})
+        # One result per requested call, keyed by the step id
+        return {
+            call.step_id: ToolResult(
+                status="passed",
+                exit_code=0,
+                outputs={"echo": call.inputs.get("message", "")},
+                executed=True,
+                complete=True,
+                current=True,
             )
-        return tuple(results)
+            for call in calls
+        }
 
 
 spec = ToolSpec(
     tool_id="demo.echo",
     contract_version="1.0.0",
     description="Echo message",
-    inputs_schema={"type": "object", "properties": {"message": {"type": "string"}}},
-    outputs_schema={"type": "object", "properties": {"echo": {"type": "string"}}},
+    input_schema={"type": "object", "properties": {"message": {"type": "string"}}},
+    output_schema={"type": "object", "properties": {"echo": {"type": "string"}}},
 )
 
 catalog = Catalog()
 catalog.register(spec, EchoAdapter())
-scope = DiscoveryScope(permissions=("tool:demo.echo",))
+# Admission is by the tool's effect, and only an explicit scope admits it
+scope = DiscoveryScope(permissions=("check",))
 
 receipt = invoke_tool(
     "demo.echo", inputs={"message": "hello"}, catalog=catalog, scope=scope
 )
-assert receipt.results[0]["outputs"]["echo"] == "hello"
+assert receipt.results["call"]["outputs"]["echo"] == "hello"
 ```
 
 ### 3.2 Bundled Records Loading and Catalog Composition
@@ -136,20 +142,20 @@ assert receipt.results[0]["outputs"]["echo"] == "hello"
 ```python
 from vesryn_tool_runtime import bundled_records, compose_catalog, open_record_store
 
-# Open persistent store (or in-memory with ":memory:")
-store = open_record_store("tools_records.sqlite3")
+# Open the in-memory store (a persistent path is the caller's own choice)
+store = open_record_store(":memory:")
 
 # Atomic batch registration of bundled seed records
 store.put_records(bundled_records())
 
 # Read-only composed catalog for discovery and resolution
 catalog = compose_catalog(store)
-tool = catalog.resolve("ripgrep")
+tool = catalog.asset("ripgrep")
 ```
 
 ### 3.3 Host Tool Preparation
 
-```python
+```python .skip
 from vesryn_tool_runtime import prepare_tool, refresh_tools
 
 # Explicitly prepare a tool declared in the seed records
