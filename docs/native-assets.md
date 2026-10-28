@@ -7,19 +7,10 @@ original 0.1.0 wheel. No consumer pin is changed here.
 
 ## Public entry points
 
-```text
-Aria2Source(executable: str, version: str, sha256: str)
-Aria2NativeBackend(index: AssetIndex, *, aria2: Aria2Source,
-                   timeout=300, max_files=10000, max_bytes=536870912)
-Aria2NativeBackend.prepare(selection: AssetSelection, *, policy: AssetPolicy,
-                          allow_network=False, source_artifact=None) -> AssetReceipt
-Aria2NativeBackend.delivery(selection: AssetSelection, *,
-                           policy: AssetPolicy) -> NativeAssetDelivery
-NativeAssetDelivery.directory -> Path
-NativeAssetDelivery.executable -> Path
-NativeAssetDelivery.entry -> str  # relative to directory
-NativeAssetDelivery.document() -> dict
-```
+`Aria2Source`, `Aria2NativeBackend` and `NativeAssetDelivery` are exported from
+`vesryn_tool_runtime`. Their signatures and types are in the
+{doc}`generated API reference <autoapi/index>`; this page keeps the behaviour,
+the failures and the ownership boundaries.
 
 These names are exported from `vesryn_tool_runtime`. Constructing a backend does
 not prepare anything. The host explicitly calls `prepare` after selecting through
