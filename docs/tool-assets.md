@@ -94,10 +94,11 @@ The same checks apply after installation and when reusing an existing entry.
 ### Installation verification
 
 The bundled `sphinx` asset declares Sphinx 9.2.0 (`sphinx-build`, Python
-`>=3.13`) and its official universal wheel's source and SHA-256. MyST-Parser
-and Sphinx-Needs are extensions of that tool environment, not independent
-Agent CLI registrations. A verified Sphinx wheel alone does not establish
-that either extension or all transitive dependencies are installed or verified.
+`>=3.13`) and its official universal wheel's source and SHA-256. MyST-Parser,
+Sphinx-Needs, CodeLinks, Test-Reports and AutoAPI are extensions of that tool
+environment, not independent Agent CLI registrations. A verified Sphinx wheel
+alone does not establish that those extensions or all transitive dependencies
+are installed or verified.
 
 ### Python CLI plugins in the same tool environment
 
@@ -125,6 +126,7 @@ receipt = prepare_tool(
         "sphinx-needs==9.1.0",
         "sphinx-codelinks==2.0.1",
         "sphinx-test-reports==3.0.1",
+        "sphinx-autoapi==3.8.1",
     ),
     allow_network=True,
 )

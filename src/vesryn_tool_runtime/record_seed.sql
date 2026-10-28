@@ -692,3 +692,17 @@ VALUES
    'https://files.pythonhosted.org/packages/37/36/3c027a699ba6f231a877f68fe6a66fbb8c2eee1c350aff20756fe29cc307/ub_test_reports-1.1.0-py3-none-any.whl',
    'sha256',
    '292c39ba01b0ac2947a02faff47b8d6e6a8140df8dc3867158f1257b123a1301');
+
+-- Griffe compares the public Python API of the package across two Git
+-- revisions. It is a CLI, not a Sphinx extension (issue #51 P2.3).
+INSERT INTO tool_asset (tool_id, name, provider, package, entrypoint) VALUES
+  ('griffe', 'Griffe', 'uv', 'griffe', 'griffe');
+
+INSERT INTO tool_release
+  (tool_id, version, platform_os, platform_arch, platform_abi,
+   platform_python, source, digest_type, digest)
+VALUES
+  ('griffe', '2.4.1', NULL, NULL, NULL, '>=3.11',
+   'https://files.pythonhosted.org/packages/29/93/67a1814b4b13e9a5cc02510dbfa1d3937603140192a701c96d861b272611/griffe-2.4.1-py3-none-any.whl',
+   'sha256',
+   'ca58ccdb1d8590ad062fad837a875dd704f94acf7a0104795a098a991ceaf728');

@@ -23,6 +23,7 @@
 :maxdepth: 2
 
 *
+autoapi/index
 adr/*
 delivery/*
 verification/tr-asset-ci-01d-semgrep/README
