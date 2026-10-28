@@ -653,7 +653,61 @@ def test_a_failed_version_probe_is_not_a_reuse(env):
     assert not tools_json(env["root"]).exists()
 
 
-def test_a_first_install_registers_a_cli_without_a_version_line(env, monkeypatch):
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("failure", ["version_exit", "startup_exit", "dependencies"])
+def test_uv_metadata_does_not_rescue_a_failed_cli(env, monkeypatch, installed, failure):
+    from vesryn_tool_runtime import host_tools
+
+    asset, _release, stored = _synthetic_declaration(env)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
+    monkeypatch.setattr(
+        host_tools,
+        "_verified_artifact",
+        lambda asset, release, **kwargs: _store_artifact(stored),
+    )
+    entry = env["bin"] / (
+        "vulture.bat" if sys.platform.startswith("win") else "vulture"
+    )
+    if installed:
+        make_command(env["bin"], "vulture", "vulture 2.16")
+    monkeypatch.setattr(
+        host_tools,
+        "_inspect_packages",
+        lambda *args: {
+            "version": "2.16",
+            "entrypoints": (str(entry),),
+            "environment": {"dependencies_consistent": failure != "dependencies"},
+        },
+    )
+
+    def runner(argv, **kwargs):
+        if isinstance(argv, list) and "install" in argv:
+            make_command(env["bin"], "vulture", "vulture 2.16")
+            return subprocess.CompletedProcess(argv, 0, "", "")
+        if "--help" in argv:
+            code = 1 if failure == "startup_exit" else 0
+            return subprocess.CompletedProcess(argv, code, "usage: vulture", "")
+        if failure == "version_exit":
+            return subprocess.CompletedProcess(argv, 42, "vulture 2.16", "")
+        if failure == "startup_exit":
+            return subprocess.CompletedProcess(argv, 1, "", "ModuleNotFoundError")
+        return subprocess.CompletedProcess(
+            argv, 2, "", "error: unrecognized arguments: --version"
+        )
+
+    outcome = prepare_tool(
+        "vulture", root=env["root"], environ=env["environ"], runner=runner
+    )
+    assert outcome["status"] == "conflict"
+    assert not tools_json(env["root"]).exists()
+
+
+@pytest.mark.parametrize("version_exit", [0, 2])
+def test_a_first_install_registers_a_cli_without_a_version_line(
+    env, monkeypatch, version_exit
+):
     """A CLI whose argparse rejects --version must still be registered.
 
     The installation produced the entry, and uv states the version of the
@@ -679,9 +733,17 @@ def test_a_first_install_registers_a_cli_without_a_version_line(env, monkeypatch
             # The install makes the command resolvable; the CLI rejects the
             # version option the way argparse does.
             if (sys.platform).startswith("win"):
-                entry.write_text("@echo vulture\n@exit /b 2\n", encoding="utf-8")
+                entry.write_text(
+                    '@echo off\nif "%1"=="--help" exit /b 0\n'
+                    f"echo vulture\nexit /b {version_exit}\n",
+                    encoding="utf-8",
+                )
             else:
-                entry.write_text("#!/bin/sh\nexit 2\n", encoding="utf-8")
+                entry.write_text(
+                    '#!/bin/sh\nif [ "$1" = "--help" ]; then exit 0; fi\n'
+                    f"echo vulture\nexit {version_exit}\n",
+                    encoding="utf-8",
+                )
                 entry.chmod(0o755)
             return subprocess.CompletedProcess(argv, 0, "", "")
         return run_real(argv, **kwargs)
@@ -693,7 +755,7 @@ def test_a_first_install_registers_a_cli_without_a_version_line(env, monkeypatch
             "package": "vulture",
             "version": "2.16",
             "entrypoints": (str(entry),),
-            "environment": {},
+            "environment": {"dependencies_consistent": True},
         },
     )
 
@@ -704,9 +766,56 @@ def test_a_first_install_registers_a_cli_without_a_version_line(env, monkeypatch
         runner=installing_uv,
     )
     assert outcome["status"] == "installed"
+    assert outcome["prepared_via"] == "uv"
+    assert outcome["source_verified"] is True
     assert read_json(tools_json(env["root"])) == [
         {"command": "vulture", "description": "检测 Python 无用代码"}
     ]
+
+
+def test_explicit_packages_can_repair_a_versionless_tool_environment(env, monkeypatch):
+    from vesryn_tool_runtime import host_tools
+
+    asset, _release, stored = _synthetic_declaration(env)
+    monkeypatch.setattr(
+        "vesryn_tool_runtime.record_sources.bundled_records", lambda: (asset,)
+    )
+    monkeypatch.setattr(
+        host_tools,
+        "_verified_artifact",
+        lambda asset, release, **kwargs: _store_artifact(stored),
+    )
+    entry = make_command(env["bin"], "vulture", "vulture")
+    environment = {
+        "dependencies_consistent": False,
+        "with_packages": (),
+        "packages": [{"name": "vulture", "version": "2.16"}],
+    }
+    monkeypatch.setattr(
+        host_tools,
+        "_inspect_packages",
+        lambda *args: {
+            "version": "2.16",
+            "entrypoints": (str(entry),),
+            "environment": environment,
+        },
+    )
+
+    def runner(argv, **kwargs):
+        if isinstance(argv, list) and "install" in argv:
+            environment["dependencies_consistent"] = True
+        return subprocess.CompletedProcess(argv, 0, "vulture", "")
+
+    outcome = prepare_tool(
+        "vulture",
+        root=env["root"],
+        environ=env["environ"],
+        runner=runner,
+        with_packages=(),
+    )
+    assert outcome["status"] == "installed"
+    assert outcome["environment"]["dependencies_consistent"] is True
+    assert outcome["source_verified"] is True
 
 
 def test_a_launch_failure_is_not_papered_over_by_the_version_fallback(env, monkeypatch):
