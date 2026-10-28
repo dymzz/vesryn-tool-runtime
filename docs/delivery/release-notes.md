@@ -182,3 +182,27 @@ must fail with a diagnostic; generation alone is not a release decision.
 See git-cliff's [command options](https://git-cliff.org/docs/usage/args/) and
 [template context](https://git-cliff.org/docs/templating/context/) for its
 native range, footer and breaking-change behavior.
+
+## Consume the candidate at the release entry
+
+The generated file is the publisher's input in `gh`'s own shape: both
+`gh release create --notes-file <file>` and `gh release edit --notes-file
+<file>` read the release notes from a file. This repository therefore
+delivers its git-cliff configuration and this output contract, and nothing
+more: it creates no publisher, no tag manager, no manifest and no release
+state machine, and it does not embed the engineering-ci release workflow.
+
+The publisher keeps everything it already owns — the version and SHA checks,
+the [Release Readiness](release-readiness.md) C1–C8 assessment, the formal CI
+evidence, the tag conflict protection, the Draft recovery, the artifact and
+manifest verification and the publication permission. Generating a candidate
+is not a release decision, and a successful generation says nothing about
+whether the release may be published.
+
+One confirmed source produces the release notes. The publisher applies the
+reviewed file as the release notes and does not add GitHub's automatic notes
+(`--generate-notes`) or the annotated tag's text (`--notes-from-tag`) to the
+same release: two sources make two different statements about what was
+delivered. If the publishing workflow currently emits automatic notes,
+replacing them with this file is the minimal interface change, and it belongs
+to the engineering-ci task that owns that workflow.
