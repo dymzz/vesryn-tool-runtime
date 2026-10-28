@@ -20,5 +20,5 @@ class VesrynToolRuntimeApi:
             .with_directory("/package", package)
             .with_workdir("/package")
             .with_exec(["uv", "build", "--wheel", "--out-dir", "/dist"])
-            .file("/dist/vesryn_tool_runtime-0.3.1-py3-none-any.whl")
+            .file("/dist/vesryn_tool_runtime-0.4.0-py3-none-any.whl")
         )

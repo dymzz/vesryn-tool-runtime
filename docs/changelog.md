@@ -97,37 +97,28 @@ its separate #14 acceptance is not part of this asset-consumer patch.
   algorithm is introduced. See
   [discovery field contracts](discovery-contracts.md) and the
   issue #27 delivery.
-## Unreleased
+## 0.4.0 — Record discovery, host tools and documentation traceability
 
-- Redo the discovery record foundation for the reopened issue #27: the three
-  logical records — ToolAsset, ToolGroup, ToolAccess — on six constrained
-  SQLite tables; the frozen DDL and seed ship as package resources
-  (`record_schema.sql`, `record_seed.sql`) read via `importlib.resources`,
-  the writable store location is always caller-supplied, releases carry
-  platform ABI and interpreter constraints, and the parity check compares
-  the full DDL, not column names. Foreign keys, enum CHECKs, uniqueness and NOT NULL
-  constraints live in the schema itself; member summaries and aliases are
-  member-level only; every entry carries its own method/target/contract; no
-  asset_id column exists. Records serialize with strict round trips and the
-  query layer carries their documents directly, replacing the five PR #28
-  deviations (including the forced access_id composition); old formats are
-  explicitly unsupported with no compatibility layer. See
-  [discovery contracts](discovery-contracts.md) and the
-  issue #27 redo record.
+- Replace the discovery prototype with `ToolAsset`, `ToolGroup` and
+  `ToolAccess` records over the packaged SQLite schema and bundled seed.
+  `bundled_records()`, `RecordStore.put_records()` and `compose_catalog()`
+  provide explicit loading, persistence and composition. Writable store
+  paths remain caller-owned; declarations do not admit execution.
+- Retire the shared-assets JSON loader API and the former discovery summary
+  models. These changes require migration from 0.3.1; see the
+  [upgrade guide](consumers.md#upgrading-from-031). Historical Binding Schema 1
+  documents remain covered by the existing compatibility tests.
+- Add explicit host CLI preparation, reuse, registration and Agent tool-list
+  publication through `prepare_tool()`. Record installation ownership and
+  verified main-artifact provenance independently from cache availability.
+  Support pinned additional packages in the same uv tool environment, and
+  register versionless CLIs only after successful entry and environment checks.
+- Add the ADR → Spec → source and Testcase → Spec documentation chains using
+  native CodeLinks and Test-Reports integrations. Generate the Python API
+  reference with AutoAPI and retain Griffe's native compatibility diagnostics.
+  Declare the conversion and comparison tools through the bundled seed.
+- Correct and execute the self-contained Python examples, check local file
+  references, and document Git-worktree builds for reproducible source URLs.
 
-## Unreleased (TR-DISC-01B)
-
-- Migrate live registration onto the #27 record foundation (issue #32): the
-  bundled seed becomes the single live declaration (20 tools — the #27 seeds
-  plus ripgrep, hyperfine, osv-scanner, actionlint, shellcheck, zizmor,
-  semgrep, lychee, pyright, deptry, pylint and vulture's still-used 2.14),
-  the shared_assets JSON documents and their loader are retired, and
-  Catalog.register_asset registers tool keys without a capability
-  prerequisite. New public chain: bundled_records (pure seed read),
-  RecordStore.put_records (atomic batch with idempotent/conflict semantics),
-  compose_catalog/ComposedCatalog (explicit composition and ordered
-  traversal, missing tool vs no-entry distinguished), plus a temporary
-  read-only bridge (legacy_preparation_definitions) for the old preparation
-  callers that #33 removes. See
-  discovery contracts and the
-  issue #32 delivery.
+The [release assessment and artifacts](https://github.com/dymzz/vesryn-tool-runtime/releases/tag/v0.4.0)
+identify the immutable source, compatibility limits and validation evidence.

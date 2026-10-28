@@ -13,3 +13,34 @@ Development `tool.uv.sources` overrides explicitly select the adjacent Tool Runt
 For local shared-tool Dagger development, pass both existing Vesryn source/module inputs and `--tool-runtime-source <authorized-runtime-checkout>` to Vesryn's Workflow CLI/Registry. The optional Python `tool_runtime_source` argument and Dagger `tool_runtime_source` Directory are forwarded explicitly. The module mounts the selected package at the path declared by the development lock. Its contents are checked on the host before/after invocation. No neighboring source is inferred.
 
 The logs repo/API is unchanged. Additional safe tool events are independent of existing workflow observations and readable history.
+
+## Upgrading from 0.3.1
+
+Version 0.4.0 replaces the discovery prototype and the shared-assets loader API.
+Regenerate discovery payloads from the current declarations; the former JSON
+shapes and summary classes have no compatibility layer.
+
+| Former interface | Current interface |
+|---|---|
+| `shared_definition_documents`, `load_shared_definitions`, `register_shared_definitions` | Read `bundled_records()`, persist explicitly with `RecordStore.put_records()`, and compose with `compose_catalog()`. |
+| `GroupSummary`, `CandidateSummary`, `AccessEntrySummary`, `ContractDetail` | Consume `ToolGroup`, `ToolAsset` and `ToolAccess` records and their documented fields. |
+| `DiscoveryPage(item_kind=..., items=...)` | Supply `record_kind` and `records` using the [current document contract](discovery-contracts.md). |
+| `GroupMember(catalog_ref=...)` | Use the member's `tool_id` and required `summary`; consult the generated API reference for optional member fields. |
+| `compose_access_id()` | Supply the declared `ToolAccess.access_id`; it is not derived from a catalog path. |
+
+Use `record_document()` and `record_from_document()` for current record
+serialization. Own the writable database path explicitly, close the store after
+use, and use `upgrade_record_store()` only for the local store versions it
+supports. It does not translate the removed discovery prototype formats.
+
+Host CLI consumers can call `prepare_tool()` with an explicit command and
+description. Registration records the actual installation owner and source
+proof; reusing an external installation does not establish publisher-artifact
+verification. See [host-tool failure semantics](tool-assets.md#operational-realities-and-failure-semantics).
+
+Griffe reports 48 native diagnostics against the 0.3.1 baseline for the accepted
+source, including the removals and constructor changes above. The release keeps
+those diagnostics as evidence. They cover Python API shape; consumers must
+verify their own CLI, SQLite, hook and runtime-behavior integrations. The package
+still requires Python 3.14 or later, and no wider consumer compatibility range
+is claimed by this release.
