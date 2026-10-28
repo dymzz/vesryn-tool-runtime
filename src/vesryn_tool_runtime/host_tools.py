@@ -167,13 +167,16 @@ def _run_env(environ):
 def _probe(command, environ, runner):
     """Resolve and read the entry's own version line; read-only.
 
-    Returns ``(entry, output, ok, detail)``. ``ok`` is False when the probe
-    itself failed — a non-zero exit code or a runner error — so a version
-    string printed by a failing command is never read as a usable entry.
+    Returns ``(entry, output, status, detail)``. The status is ``"ok"``
+    when the entry ran and exited zero, ``"no_version"`` when it ran but
+    did not — a CLI whose argparse rejects the option still ran, and that
+    is a different fact from an entry that could not start at all
+    (``"not_launched"``). A version string printed by a failing command is
+    never read as a usable entry.
     """
     entry = _which(command, environ)
     if entry is None:
-        return None, None, False, "not resolvable in the target shell"
+        return None, None, "missing", "not resolvable in the target shell"
     if entry.lower().endswith((".bat", ".cmd")):
         # cmd.exe needs the whole line quoted, otherwise a path with
         # spaces is split into two arguments.
@@ -191,13 +194,13 @@ def _probe(command, environ, runner):
             env=_run_env(environ),
         )
     except OSError, subprocess.SubprocessError:
-        return entry, None, False, "version probe could not run"
+        return entry, None, "not_launched", "version probe could not run"
     output = (result.stdout or "").strip()
     if not output:
         output = (result.stderr or "").strip()
     if result.returncode != 0:
-        return entry, output, False, f"version probe exited {result.returncode}"
-    return entry, output, True, ""
+        return entry, output, "no_version", f"version probe exited {result.returncode}"
+    return entry, output, "ok", ""
 
 
 def _reported_versions(text):
@@ -238,6 +241,32 @@ def _matched_version(reported, candidates):
         if _version_matches(reported, candidate):
             return candidate
     return None
+
+
+def _uv_entry_version(uv, asset, environ, runner, entry, version):
+    """The version of a uv tool entry that prints no version line of its own.
+
+    uv states the version of the environment it manages and the entries it
+    exposes, so a CLI without a ``--version`` line is still verifiable. The
+    version is accepted only when the resolved entry IS that environment's own
+    entry and it names the selected release: an entry of another installation
+    stays the honest conflict it was before.
+    """
+    if asset.provider != "uv":
+        return None
+    try:
+        observed = _inspect_packages(uv, asset, environ, runner)
+    except HostToolError:
+        return None
+    if observed is None:
+        return None
+    if not any(_same_entry(entry, path) for path in observed["entrypoints"]):
+        return None
+    reported = observed["version"]
+    if version is None:
+        declared = {item.version for item in asset.versions}
+        return reported if reported in declared else None
+    return version if _version_matches({reported}, version) else None
 
 
 def _find_release(asset, version, platform=None):
@@ -349,11 +378,11 @@ def prepare_tool(
     # SELECTED version. A same-name entry of another version — or an entry
     # whose version probe failed — is an honest conflict: it is never
     # overwritten and never silently registered under another version.
-    entry, shown, probed, probe_detail = _probe(command, environ, runner)
+    entry, shown, status, probe_detail = _probe(command, environ, runner)
     if entry is not None:
-        if not probed:
-            # The probe FAILED: its output is not evidence that the entry
-            # works, so nothing is registered for it.
+        if status == "not_launched":
+            # The entry could not be started at all: that failure is the
+            # fact about it, and no other source may paper over it.
             return _outcome(
                 "conflict",
                 tool_id,
@@ -362,22 +391,37 @@ def prepare_tool(
                 entry,
                 detail=probe_detail,
             )
-        reported = _reported_versions(shown)
-        if version is None:
-            # No explicit selection: any declared release the entry reports
-            # is a legitimate reuse, reported with the version it shows.
-            matched = _matched_version(reported, sorted(declared_versions))
+        if status == "no_version":
+            # The entry ran but printed no version. A uv tool states its
+            # version in uv's own listing rather than on a version line,
+            # so that is read next -- and only for the entry uv itself owns.
+            matched = _uv_entry_version(uv, asset, environ, runner, entry, version)
+            if matched is None:
+                return _outcome(
+                    "conflict",
+                    tool_id,
+                    command,
+                    version,
+                    entry,
+                    detail=probe_detail,
+                )
         else:
-            matched = version if _version_matches(reported, version) else None
-        if matched is None:
-            return _outcome(
-                "conflict",
-                tool_id,
-                command,
-                version,
-                entry,
-                detail=f"existing entry reports: {(shown or '')[:120]}",
-            )
+            reported = _reported_versions(shown)
+            if version is None:
+                # No explicit selection: any declared release the entry reports
+                # is a legitimate reuse, reported with the version it shows.
+                matched = _matched_version(reported, sorted(declared_versions))
+            else:
+                matched = version if _version_matches(reported, version) else None
+            if matched is None:
+                return _outcome(
+                    "conflict",
+                    tool_id,
+                    command,
+                    version,
+                    entry,
+                    detail=f"existing entry reports: {(shown or '')[:120]}",
+                )
         # Keep the recorded installation owner and its actual artifact proof.
         # The current declaration is compared with that proof below; a cache
         # hit or successful version probe never creates source evidence.
@@ -452,12 +496,14 @@ def prepare_tool(
             reinstall_main=packages is not None
             and proof != (release.source, release.digest),
         )
-        entry, shown, probed, probe_detail = _probe(command, environ, runner)
+        entry, shown, status, probe_detail = _probe(command, environ, runner)
         if entry is None:
             raise HostToolError(
                 "install_incomplete", f"{command} not resolvable after uv install"
             )
-        if not probed:
+        if status == "not_launched":
+            # The freshly installed entry could not be started at all: that
+            # failure is the fact, and nothing is registered from it.
             return _outcome(
                 "conflict",
                 tool_id,
@@ -466,7 +512,20 @@ def prepare_tool(
                 entry,
                 detail=probe_detail,
             )
-        if not _version_matches(_reported_versions(shown), version):
+        if status == "no_version":
+            # The entry ran but printed no version. uv states the version of
+            # the environment it manages, so that is read here as well --
+            # otherwise a first installation could never be registered.
+            if _uv_entry_version(uv, asset, environ, runner, entry, version) is None:
+                return _outcome(
+                    "conflict",
+                    tool_id,
+                    command,
+                    version,
+                    entry,
+                    detail=probe_detail,
+                )
+        elif not _version_matches(_reported_versions(shown), version):
             # The resolved entry is not the selected release (a same-name
             # entry shadows it): the Agent would run another version, so
             # nothing is registered under the selected one.
