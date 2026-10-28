@@ -22,7 +22,12 @@ source-include = ["docs/**", "examples/**", "api/dagger.json", "api/pyproject.to
 vesryn-log = { git = "https://github.com/dymzz/vesryn-log.git", rev = "030c5a8edf820588e29f53803b6baaf53b1f6e57" }
 
 [dependency-groups]
-dev = ["pytest==9.0.3", "ruff==0.16.10", "ub-test-reports[pytest]==1.1.0"]
+dev = [
+    "pytest==9.0.3",
+    "pytest-examples==0.0.18",
+    "ruff==0.16.10",
+    "ub-test-reports[pytest]==1.1.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

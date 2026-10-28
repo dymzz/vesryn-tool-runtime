@@ -1,0 +1,11 @@
+# Link checker settings for the manual's pages (issue #51 P2.4).
+#
+# The checker is the native lychee CLI. This file carries only the settings
+# the repository needs; the pages under review stay on the command line, so
+# the scope of the check is explicit and reviewable.
+
+[hosts."packaging.python.org"]
+# The host throttles bursts on this network. One request at a time keeps the
+# check honest instead of turning a throttle into a reported failure.
+concurrency = 1
+request_interval = "1s"
