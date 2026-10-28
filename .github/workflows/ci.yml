@@ -34,7 +34,7 @@ jobs:
           uv build
           uv export --locked --no-dev --no-emit-project --output-file "$RUNNER_TEMP/tool-runtime.txt"
           uv venv --python 3.14 "$RUNNER_TEMP/tool-runtime-wheel"
-          uv pip install --python "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -r "$RUNNER_TEMP/tool-runtime.txt" dist/vesryn_tool_runtime-0.3.1-py3-none-any.whl
+          uv pip install --python "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -r "$RUNNER_TEMP/tool-runtime.txt" dist/vesryn_tool_runtime-0.4.0-py3-none-any.whl
           unset GH_TOKEN
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I examples/direct_tool.py
           "$RUNNER_TEMP/tool-runtime-wheel/bin/python" -I -c 'import importlib.util as u; assert u.find_spec("vesryn") is None and u.find_spec("engineering_ci") is None'
@@ -86,7 +86,7 @@ jobs:
               legacy_preparation_definitions, open_record_store,
           )
 
-          assert version("vesryn-tool-runtime") == "0.3.1"
+          assert version("vesryn-tool-runtime") == "0.4.0"
           records = bundled_records()
           assets = [r for r in records if isinstance(r, ToolAsset)]
           identities = [r.tool_id for r in assets]

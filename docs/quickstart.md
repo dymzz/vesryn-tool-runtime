@@ -1,6 +1,6 @@
 # Quickstart
 
-Python 3.14+ is required. Build `vesryn-tool-runtime==0.3.1` with `uv build` and
+Python 3.14+ is required. Build `vesryn-tool-runtime==0.4.0` with `uv build` and
 install its wheel with normal dependency resolution. Its runtime dependencies are
 `filelock==3.20.3`, `jsonschema==4.26.0`, `packaging==26.3`, and
 `vesryn-log>=0.1.0,<0.2.0`.
